@@ -1,0 +1,8 @@
+*bak*
+/data/
+/config/
+/music/
+*.pyc
+__pycache__/
+.env
+*.log

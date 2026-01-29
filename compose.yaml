@@ -1,0 +1,35 @@
+services:
+  beets-single:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: beets-single-5
+    restart: unless-stopped
+    ports:
+      - "7080:7080"
+      - "8337:8337"
+    environment:
+      BEETS_CONFIG: /config/config.yaml
+      BEETS_LIBRARY: /data/beets-library.blb
+      APP_PORT: "7080"
+      INBOX_DIR: /music/inbox
+    user: "1000:1000"
+    volumes:
+      - ./public:/app/static:ro
+      - /srv/dev-disk-by-uuid-306c14f2-0239-4b1e-8775-915dfdd88bd0/NVME/Docket_Configs/beets-replacement-5/config:/config:rw
+      - /srv/dev-disk-by-uuid-901efa52-2e9a-4fdd-a53c-08b891fb8458/SnapRaid_mergerfs/Beets-Flask/clean:/music/library
+      - /srv/dev-disk-by-uuid-901efa52-2e9a-4fdd-a53c-08b891fb8458/SnapRaid_mergerfs/Downloads/Audio:/music/inbox
+      - ./data:/data:rw
+      - ./data:/app/data:rw
+      - ./backend:/app/backend:rw
+      - ./scripts:/app/scripts:rw
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:7080/api/stats || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

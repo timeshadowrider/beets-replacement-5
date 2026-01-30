@@ -1,7 +1,7 @@
-# backend/app.py
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 import subprocess
 import json
 import os
@@ -11,12 +11,14 @@ import logging
 import time
 import threading
 from pathlib import Path
+from datetime import datetime
 import mutagen
 import humanize
 from queue import Queue, Empty
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
+# Application setup
 app = FastAPI(title="Beets Replacement API")
 
 app.add_middleware(
@@ -25,6 +27,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ---------------------------------------------------------------------------
+# STATIC MOUNT (ADDED)
+# ---------------------------------------------------------------------------
+
+app.mount("/static", StaticFiles(directory="/app/static"), name="static")
 
 # ---------------------------------------------------------------------------
 # CONFIG / PATHS
@@ -38,6 +46,10 @@ INDEX_HTML = "/app/static/index.html"
 
 INBOX_PATH = Path("/music/inbox")
 LIBRARY_PATH = Path("/music/library")
+
+inbox_stats_cache = None
+inbox_stats_cache_time = None
+INBOX_STATS_CACHE_SECONDS = 60
 
 # Tunables
 DEBOUNCE_INBOX = 20.0
@@ -61,7 +73,7 @@ def run_cmd(cmd, timeout=300):
     except Exception as e:
         return False, str(e)
 
-def _run_cmd_list(cmd_list, timeout=300):
+def run_cmd_list(cmd_list, timeout=300):
     try:
         p = subprocess.run(cmd_list, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=timeout)
         return p.returncode == 0, p.stdout or ""
@@ -78,7 +90,6 @@ def serve_library_file(full_path: str):
     base = Path("/music/library")
     requested = (base / full_path).resolve()
     
-    # Ensure the resolved path is within the base directory
     try:
         requested.relative_to(base)
     except ValueError:
@@ -119,14 +130,67 @@ def serve_albums_json():
 @app.get("/api/stats")
 def stats():
     ok, out = run_cmd(f"beet -c {shlex.quote(BEETS_CONFIG)} stats")
-    if ok:
-        return {"beets_stats": out}
+
+    if ok and out:
+        tracks = 0
+        albums = 0
+        album_artists = 0
+        total_time = "0 seconds"
+        total_size = "0 B"
+
+        for line in out.splitlines():
+            line = line.strip()
+
+            if line.startswith("Tracks:"):
+                try:
+                    tracks = int(line.split(":", 1)[1].strip())
+                except:
+                    pass
+
+            elif line.startswith("Albums:"):
+                try:
+                    albums = int(line.split(":", 1)[1].strip())
+                except:
+                    pass
+
+            elif line.startswith("Album artists:"):
+                try:
+                    album_artists = int(line.split(":", 1)[1].strip())
+                except:
+                    pass
+
+            elif line.startswith("Total time:"):
+                total_time = line.split(":", 1)[1].strip()
+
+            elif line.startswith("Approximate total size:"):
+                total_size = line.split(":", 1)[1].strip()
+
+        return {
+            "tracks": tracks,
+            "albums": albums,
+            "album_artists": album_artists,
+            "total_time": total_time,
+            "total_size": total_size
+        }
+
     try:
         with open(ALBUMS_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
-        return {"albums": len(data)}
-    except Exception as e:
-        return {"albums": 0, "error": str(e)}
+        return {
+            "tracks": 0,
+            "albums": len(data),
+            "album_artists": len({a.get("albumartist") for a in data}),
+            "total_time": "unknown",
+            "total_size": "unknown"
+        }
+    except:
+        return {
+            "tracks": 0,
+            "albums": 0,
+            "album_artists": 0,
+            "total_time": "unknown",
+            "total_size": "unknown"
+        }
 
 @app.post("/api/library/refresh")
 def refresh_library():
@@ -141,9 +205,9 @@ def refresh_library():
 def import_library(background_tasks: BackgroundTasks):
     cmd = f"beet -c {shlex.quote(BEETS_CONFIG)} import -A /music/inbox"
     try:
-        def _run():
+        def run():
             subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        background_tasks.add_task(_run)
+        background_tasks.add_task(run)
         return {"status": "started", "cmd": cmd}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -172,13 +236,21 @@ def recent(limit: int = 12):
 
 @app.get("/api/inbox/stats")
 def inbox_stats():
-    tracks = 0
-    total_seconds = 0
-    total_bytes = 0
-    artists = set()
-    albums = set()
-    albumartists = set()
+    global inbox_stats_cache, inbox_stats_cache_time
+    
+    now = datetime.now()
+    if (inbox_stats_cache is not None and 
+        inbox_stats_cache_time is not None and 
+        (now - inbox_stats_cache_time).total_seconds() < INBOX_STATS_CACHE_SECONDS):
+        return inbox_stats_cache
+    
+    stats = compute_inbox_stats_fast()
+    inbox_stats_cache = stats
+    inbox_stats_cache_time = now
+    
+    return stats
 
+def compute_inbox_stats_fast():
     if not INBOX_PATH.exists():
         return {
             "tracks": 0,
@@ -186,53 +258,47 @@ def inbox_stats():
             "total_size": "0 B",
             "artists": 0,
             "albums": 0,
-            "albumartists": 0,
+            "album_artists": 0,
         }
-
-    for file in INBOX_PATH.rglob("*"):
-        if not file.is_file():
-            continue
-        if file.suffix.lower() not in [".mp3", ".flac", ".m4a", ".ogg"]:
-            continue
-
-        try:
-            audio = mutagen.File(file)
-            if not audio or not getattr(audio, "info", None):
+    
+    tracks = 0
+    total_bytes = 0
+    artists = set()
+    albums = set()
+    
+    try:
+        for artist_dir in INBOX_PATH.iterdir():
+            if not artist_dir.is_dir() or artist_dir.name.startswith('.'):
                 continue
-            tracks += 1
-            total_seconds += int(audio.info.length)
-            total_bytes += file.stat().st_size
-
-            tags = audio.tags or {}
-            def _get_tag(t):
-                v = tags.get(t)
-                if not v:
-                    return None
-                if isinstance(v, (list, tuple)):
-                    return str(v[0])
-                return str(v)
-
-            tag_artist = _get_tag("artist")
-            tag_album = _get_tag("album")
-            tag_albumartist = _get_tag("albumartist")
-
-            if tag_artist:
-                artists.add(tag_artist)
-            if tag_album:
-                albums.add(tag_album)
-            if tag_albumartist:
-                albumartists.add(tag_albumartist)
-
-        except Exception:
-            continue
-
+            artists.add(artist_dir.name)
+            
+            for album_dir in artist_dir.iterdir():
+                if not album_dir.is_dir() or album_dir.name.startswith('.'):
+                    continue
+                albums.add(f"{artist_dir.name}::{album_dir.name}")
+                
+                for file in album_dir.iterdir():
+                    if not file.is_file():
+                        continue
+                    if file.suffix.lower() in [".mp3", ".flac", ".m4a", ".ogg", ".wav", ".aac"]:
+                        tracks += 1
+                        try:
+                            total_bytes += file.stat().st_size
+                        except Exception:
+                            pass
+    except Exception as e:
+        logger.error(f"Error computing inbox stats: {e}")
+    
+    estimated_minutes = total_bytes / (200 * 1024) if total_bytes > 0 else 0
+    estimated_seconds = int(estimated_minutes * 60)
+    
     return {
         "tracks": tracks,
-        "total_time": humanize.precisedelta(total_seconds),
+        "total_time": humanize.precisedelta(estimated_seconds) if estimated_seconds > 0 else "0 seconds",
         "total_size": humanize.naturalsize(total_bytes),
         "artists": len(artists),
         "albums": len(albums),
-        "albumartists": len(albumartists),
+        "album_artists": len(artists),
     }
 
 @app.get("/api/inbox/tree")
@@ -258,23 +324,21 @@ def inbox_folder(artist: str, album: str):
 # WATCHERS / WORKERS
 # ---------------------------------------------------------------------------
 
-_inbox_q = Queue()
-_lib_q = Queue()
-_inbox_last = {}
-_lib_last = {}
-_inbox_lock = threading.Lock()
-_lib_lock = threading.Lock()
-_stop_event = threading.Event()
+inbox_q = Queue()
+lib_q = Queue()
+inbox_last = {}
+lib_last = {}
+inbox_lock = threading.Lock()
+lib_lock = threading.Lock()
+stop_event = threading.Event()
 
-# Initialize observer and worker variables
-_inbox_observer = None
-_lib_observer = None
-_inbox_worker_thread = None
-_lib_worker_thread = None
+inbox_observer = None
+lib_observer = None
+inbox_worker_thread = None
+lib_worker_thread = None
 
-# Track queued items to prevent duplicates
-_inbox_queued = set()
-_lib_queued = set()
+inbox_queued = set()
+lib_queued = set()
 
 class InboxHandler(FileSystemEventHandler):
     def on_any_event(self, event):
@@ -286,17 +350,17 @@ class InboxHandler(FileSystemEventHandler):
             if not target or base.startswith(".") or base.startswith("~"):
                 return
             now = time.time()
-            with _inbox_lock:
-                last = _inbox_last.get(target, 0)
+            with inbox_lock:
+                last = inbox_last.get(target, 0)
                 if now - last < DEBOUNCE_INBOX:
                     return
-                _inbox_last[target] = now
-                if target in _inbox_queued:
+                inbox_last[target] = now
+                if target in inbox_queued:
                     logger.debug("Inbox already queued: %s", target)
                     return
-                _inbox_queued.add(target)
+                inbox_queued.add(target)
             logger.info("Inbox enqueue: %s", target)
-            _inbox_q.put(target)
+            inbox_q.put(target)
         except Exception:
             logger.exception("Inbox handler error")
 
@@ -312,37 +376,36 @@ class LibraryHandler(FileSystemEventHandler):
             if base.startswith(".") or base.startswith("~"):
                 return
             now = time.time()
-            with _lib_lock:
-                last = _lib_last.get(target, 0)
+            with lib_lock:
+                last = lib_last.get(target, 0)
                 if now - last < DEBOUNCE_LIBRARY:
                     return
-                _lib_last[target] = now
-                if target in _lib_queued:
+                lib_last[target] = now
+                if target in lib_queued:
                     logger.debug("Library already queued: %s", target)
                     return
-                _lib_queued.add(target)
+                lib_queued.add(target)
             logger.info("Library enqueue: %s", target)
-            _lib_q.put(target)
+            lib_q.put(target)
         except Exception:
             logger.exception("Library handler error")
 
 def inbox_worker(beets_config_path: str):
     logger.info("Inbox worker started")
-    while not _stop_event.is_set():
+    while not stop_event.is_set():
         try:
-            target = _inbox_q.get(timeout=1)
+            target = inbox_q.get(timeout=1)
         except Empty:
             continue
-        
-        # Remove from queued set
-        with _inbox_lock:
-            _inbox_queued.discard(target)
-        
+
+        with inbox_lock:
+            inbox_queued.discard(target)
+
         try:
             time.sleep(DEBOUNCE_INBOX)
             if not os.path.exists(target):
                 logger.info("Inbox target disappeared: %s", target)
-                _inbox_q.task_done()
+                inbox_q.task_done()
                 continue
             args = ["beet", "-c", beets_config_path, "import", "-A", target]
             logger.info("Running import: %s", " ".join(shlex.quote(a) for a in args))
@@ -355,110 +418,118 @@ def inbox_worker(beets_config_path: str):
         except Exception:
             logger.exception("Exception during inbox import for %s", target)
         finally:
-            _inbox_q.task_done()
+            inbox_q.task_done()
     logger.info("Inbox worker stopping")
 
 def library_worker():
     logger.info("Library worker started")
-    while not _stop_event.is_set():
+    while not stop_event.is_set():
         try:
-            target = _lib_q.get(timeout=1)
+            target = lib_q.get(timeout=1)
         except Empty:
             continue
-        
-        # Remove from queued set
-        with _lib_lock:
-            _lib_queued.discard(target)
-        
+
+        with lib_lock:
+            lib_queued.discard(target)
+
         try:
             time.sleep(DEBOUNCE_LIBRARY)
             if not os.path.exists(target):
                 logger.info("Library target missing: %s", target)
-                _lib_q.task_done()
+                lib_q.task_done()
                 continue
 
             success = False
             tried = []
 
             if os.path.exists(REGEN_SCRIPT):
-                # 1) exact path
+                # 1) Try exact path
                 cmd1 = ["python3", REGEN_SCRIPT, target]
                 tried.append(("exact", cmd1))
-                ok, out = _run_cmd_list(cmd1, timeout=REGEN_TIMEOUT)
+                ok, out = run_cmd_list(cmd1, timeout=REGEN_TIMEOUT)
                 if ok:
                     success = True
                 else:
-                    # 2) strip trailing bracketed suffix like " [241]" using a single-line regex
-                    t2 = re.sub(r'\s*\[\d+\]\s*$', '', target)
+                    # 2) Strip trailing bracketed suffixes - REGEX FIXED HERE
+                    t2 = re.sub(r'\s\[\d+\]$', '', target)
                     if t2 != target and os.path.exists(t2):
                         cmd2 = ["python3", REGEN_SCRIPT, t2]
-                        tried.append(("strip_brackets", cmd2))
-                        ok, out = _run_cmd_list(cmd2, timeout=REGEN_TIMEOUT)
+                        tried.append(("stripbrackets", cmd2))
+                        ok, out = run_cmd_list(cmd2, timeout=REGEN_TIMEOUT)
                         if ok:
                             success = True
 
-                # 3) fallback: full regen
+                # 3) Fallback: Run full regen
                 if not success:
                     cmd3 = ["python3", REGEN_SCRIPT]
                     tried.append(("full", cmd3))
-                    ok, out = _run_cmd_list(cmd3, timeout=REGEN_TIMEOUT * 2)
+                    ok, out = run_cmd_list(cmd3, timeout=REGEN_TIMEOUT * 2)
                     if ok:
                         success = True
 
                 if success:
                     logger.info("Regen succeeded for %s", target)
+                    # Trigger recompute of recent lists
+                    try:
+                        ok, out = run_cmd_list(["python3", "/app/scripts/recompute_recent.py"], timeout=120)
+                        if ok:
+                            logger.info("Recompute recent succeeded for %s", target)
+                        else:
+                            logger.error("Recompute recent failed for %s: %s", target, (out or "")[:400])
+                    except Exception:
+                        logger.exception("Exception while running recompute_recent for %s", target)
                 else:
                     logger.error("Regen failed for %s after tries: %s", target, [t[0] for t in tried])
             else:
                 logger.warning("REGEN_SCRIPT missing; no action for %s", target)
 
         except Exception:
-            logger.exception("Exception during library regen for %s", target)
+            logger.exception("Exception during library processing for %s", target)
         finally:
-            _lib_q.task_done()
+            lib_q.task_done()
     logger.info("Library worker stopping")
 
 @app.on_event("startup")
 def start_watchers():
-    global _inbox_observer, _lib_observer, _inbox_worker_thread, _lib_worker_thread
+    global inbox_observer, lib_observer, inbox_worker_thread, lib_worker_thread
     if INBOX_PATH.exists():
-        _inbox_observer = Observer()
-        _inbox_observer.schedule(InboxHandler(), str(INBOX_PATH), recursive=True)
-        _inbox_observer.start()
-        _inbox_worker_thread = threading.Thread(target=inbox_worker, args=(BEETS_CONFIG,), daemon=True)
-        _inbox_worker_thread.start()
+        inbox_observer = Observer()
+        inbox_observer.schedule(InboxHandler(), str(INBOX_PATH), recursive=True)
+        inbox_observer.start()
+        inbox_worker_thread = threading.Thread(target=inbox_worker, args=(BEETS_CONFIG,), daemon=True)
+        inbox_worker_thread.start()
         logger.info("Started inbox watcher on %s", INBOX_PATH)
     else:
         logger.warning("Inbox path missing: %s", INBOX_PATH)
 
     if LIBRARY_PATH.exists():
-        _lib_observer = Observer()
-        _lib_observer.schedule(LibraryHandler(), str(LIBRARY_PATH), recursive=True)
-        _lib_observer.start()
-        _lib_worker_thread = threading.Thread(target=library_worker, daemon=True)
-        _lib_worker_thread.start()
+        lib_observer = Observer()
+        lib_observer.schedule(LibraryHandler(), str(LIBRARY_PATH), recursive=True)
+        lib_observer.start()
+        lib_worker_thread = threading.Thread(target=library_worker, daemon=True)
+        lib_worker_thread.start()
         logger.info("Started library watcher on %s", LIBRARY_PATH)
     else:
         logger.warning("Library path missing: %s", LIBRARY_PATH)
 
 @app.on_event("shutdown")
 def stop_watchers():
-    global _inbox_observer, _lib_observer
+    global inbox_observer, lib_observer
     logger.info("Stopping watchers")
-    _stop_event.set()
+    stop_event.set()
     
     try:
-        if _inbox_observer is not None:
-            _inbox_observer.stop()
-            _inbox_observer.join(timeout=5)
+        if inbox_observer is not None:
+            inbox_observer.stop()
+            inbox_observer.join(timeout=5)
             logger.info("Stopped inbox observer")
     except Exception:
         logger.exception("Error stopping inbox observer")
     
     try:
-        if _lib_observer is not None:
-            _lib_observer.stop()
-            _lib_observer.join(timeout=5)
+        if lib_observer is not None:
+            lib_observer.stop()
+            lib_observer.join(timeout=5)
             logger.info("Stopped library observer")
     except Exception:
         logger.exception("Error stopping library observer")

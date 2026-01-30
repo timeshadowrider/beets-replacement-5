@@ -1,373 +1,579 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Beets Album Status</title>
-  <style>
-    body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      margin: 0;
-      padding: 16px;
-      background: #eaeef2;
-      color: #222;
-    }
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Beets Album Status</title>
 
-    h1 {
-      margin-top: 0;
-      margin-bottom: 12px;
-    }
+<style>
+/* ==================== Neon Dark Theme ==================== */
 
-    h2 {
-      margin: 0 0 8px 0;
-      font-size: 16px;
-    }
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  margin: 0;
+  padding: 16px;
+  background-color: #121212;
+  color: #eee;
+}
 
-    button {
-      margin: 2px 4px 2px 0;
-      padding: 6px 10px;
-      font-size: 13px;
-      cursor: pointer;
-      background: #f0f4f8;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-    }
+/* Headings */
+h1 {
+  margin-top: 0;
+  margin-bottom: 12px;
+  color: #f0f; /* neon pink */
+}
+h2 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  color: #0ff; /* cyan */
+}
+h3 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  color: #0cc; /* darker cyan */
+}
 
-    .top-container {
-      display: grid;
-      grid-template-columns: 260px 1fr;
-      gap: 16px;
-      margin-bottom: 16px;
-    }
+/* Buttons */
+button {
+  margin: 2px 4px 2px 0;
+  padding: 6px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  background: #f0f; /* neon pink */
+  border: 1px solid #f0f;
+  border-radius: 4px;
+  color: #fff;
+  transition: background 0.2s, transform 0.1s;
+}
+button:hover {
+  background: #f0a;
+  transform: scale(1.02);
+}
 
-    .bottom-container {
-      display: grid;
-      grid-template-columns: 320px 1.2fr 0.9fr 260px;
-      gap: 16px;
-    }
+/* Layout containers */
+.top-container {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.bottom-container {
+  display: grid;
+  grid-template-columns: 260px 1fr 1fr 260px 260px; /* 5 columns: list, grid, recent, artists, inbox */
+  gap: 16px;
+}
 
-    .box {
-      background: #ffffff;
-      border-radius: 8px;
-      padding: 12px 14px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.06);
-      box-sizing: border-box;
-    }
+/* Boxes */
+.box {
+  background: #222;
+  border-radius: 8px;
+  padding: 12px 14px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  border: 1px solid #333;
+}
 
-    .stats-box div {
-      margin-bottom: 4px;
-      font-size: 13px;
-    }
+/* Stats */
+.stats-box div {
+  margin-bottom: 4px;
+  font-size: 13px;
+  color: #eee;
+}
+.stats-box pre {
+  white-space: pre-wrap;
+  font-size: 11px;
+  margin: 0;
+  color: #66f;
+}
+#status {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #ff0;
+}
 
-    #status {
-      margin-top: 8px;
-      font-size: 13px;
-      color: #555;
-    }
+/* Album list */
+.albums-box {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.albums-box h2 {
+  flex-shrink: 0;
+}
+#search {
+  flex-shrink: 0;
+}
+#album-list {
+  overflow-y: auto;
+  max-height: calc(100vh - 200px);
+}
+.album-row {
+  padding: 4px 0;
+  border-bottom: 1px solid #444;
+}
+.album-title {
+  font-weight: 500;
+  color: #fff;
+  font-size: 12px;
+}
+.album-meta {
+  font-size: 11px;
+  color: #bbb;
+}
 
-    .albums-box {
-      display: flex;
-      flex-direction: column;
-    }
+/* Album grid */
+.album-grid-container {
+  overflow-y: auto;
+  max-height: calc(100vh - 200px);
+}
+.album-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr); /* 4 columns for 120px images */
+  gap: 8px;
+}
+.album-grid-item {
+  background: #181818;
+  border-radius: 2px;
+  padding: 2px;
+  border: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 11px;
+}
+.album-grid-cover {
+  width: 100px;
+  height: 100px;
+  background: #111;
+  border-radius: 2px;
+  overflow: hidden;
+  border: 1px solid #444;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.album-grid-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.album-grid-title {
+  font-weight: 500;
+  color: #fff;
+  text-align: center;
+  font-size: 11px;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.album-grid-meta {
+  font-size: 10px;
+  color: #bbb;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
 
-    #search {
-      width: 100%;
-      box-sizing: border-box;
-      padding: 6px 8px;
-      margin-bottom: 8px;
-      font-size: 13px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      background: #f9fbfd;
-    }
+/* Recent albums */
+.recent-box {
+  width: 160px; /* choose your width */ 
+  flex: 0 0 160px; /* prevents flex resizing */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.recent-box h2 {
+  flex-shrink: 0;
+}
+#recent-albums {
+  overflow-y: auto;
+  max-height: calc(100vh - 200px);
+}
+.recent-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 11px;
+  text-align: center;
+  color: #eee;
+  margin-bottom: 10px;
+}
+.recent-cover {
+  width: 120px;
+  height: 120px;
+  background: #111;
+  border: 1px solid #555;
+  margin-bottom: 6px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.recent-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.recent-title {
+  font-weight: 500;
+  font-size: 11px;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  width: 100%;
+}
+.recent-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  align-items: center;
+  margin-top: 4px;
+  font-size: 10px;
+  color: #ccc;
+  width: 100%;
+}
 
-    #album-list {
-      flex: 1;
-      overflow-y: auto;
-      max-height: calc(100vh - 220px);
-      font-size: 13px;
-    }
+/* Recent artists */
+.artists-box {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.artists-box h2 {
+  flex-shrink: 0;
+}
+#recent-artists {
+  overflow-y: auto;
+  max-height: calc(100vh - 200px);
+}
+.artist-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.artist-row img {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  margin-right: 8px;
+  object-fit: cover;
+  border: 1px solid #555;
+  background: #222;
+  flex-shrink: 0;
+}
+.artist-name {
+  font-weight: 500;
+  color: #eee;
+  font-size: 12px;
+}
+.artist-meta {
+  font-size: 11px;
+  color: #999;
+}
 
-    .album-row {
-      padding: 4px 0;
-      border-bottom: 1px solid #eee;
-    }
+/* Inbox */
+.inbox-box {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.inbox-box h2 {
+  flex-shrink: 0;
+}
+#inbox-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 12px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+#inbox-summary div {
+  font-size: 13px;
+  color: #eee;
+}
+#inbox-summary .full-width {
+  grid-column: 1 / -1;
+}
+.inbox-note {
+  font-size: 12px;
+  color: #999;
+  margin-top: 8px;
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+#inbox-tree {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #ccc;
+  max-height: calc((100vh - 200px) / 2);
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+#inbox-files {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #eee;
+  max-height: calc((100vh - 200px) / 2);
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+#inbox-files ul {
+  padding-left: 16px;
+  margin: 8px 0;
+}
+#inbox-files li {
+  margin-bottom: 2px;
+}
 
-    .album-title {
-      font-weight: 500;
-    }
+/* Inbox tree items */
+.inbox-artist {
+  font-weight: 500;
+  margin-top: 4px;
+  color: #0ff;
+}
+.inbox-albums {
+  margin-left: 8px;
+}
+.inbox-album {
+  cursor: pointer;
+  color: #ccc;
+  margin: 2px 0;
+}
+.inbox-album:hover {
+  color: #fff;
+}
 
-    .album-meta {
-      font-size: 12px;
-      color: #666;
-    }
+/* Search */
+#search {
+  width: 100%;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+  border: 1px solid #444;
+  background: #111;
+  color: #eee;
+  font-size: 13px;
+}
 
-    .recent-carousel {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-      gap: 12px;
-      align-items: flex-start;
-    }
-
-    .recent-item {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      font-size: 12px;
-      text-align: center;
-    }
-
-    .recent-cover {
-      width: 140px;
-      height: 140px;
-      background: #f0f0f0;
-      border: 1px solid #ccc;
-      margin-bottom: 4px;
-      overflow: hidden;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 4px;
-    }
-
-    .recent-cover img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
-    .recent-title {
-      font-weight: 500;
-    }
-
-    .recent-artist {
-      color: #666;
-    }
-
-    .artist-row {
-      display: flex;
-      align-items: center;
-      margin-bottom: 8px;
-    }
-
-    .artist-row img {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      margin-right: 8px;
-      object-fit: cover;
-      border: 1px solid #ccc;
-      background: #eee;
-    }
-
-    .artist-name {
-      font-weight: 500;
-    }
-
-    .artist-meta {
-      font-size: 12px;
-      color: #666;
-    }
-
-    .inbox-box {
-      font-size: 13px;
-    }
-
-    #inbox-summary div {
-      margin-bottom: 4px;
-    }
-
-    .inbox-note {
-      font-size: 12px;
-      color: #666;
-      margin-top: 6px;
-      line-height: 1.4;
-    }
-
-    #inbox-tree {
-      margin-top: 10px;
-      font-size: 13px;
-    }
-
-    .inbox-artist {
-      font-weight: 500;
-      margin-top: 8px;
-    }
-
-    .inbox-albums {
-      margin-left: 12px;
-      margin-bottom: 6px;
-    }
-
-    .inbox-album {
-      cursor: pointer;
-      color: #444;
-    }
-
-    #inbox-files {
-      margin-top: 12px;
-      font-size: 13px;
-    }
-
-    #inbox-files ul {
-      padding-left: 16px;
-    }
-
-    #inbox-files li {
-      margin-bottom: 2px;
-    }
-  </style>
+/* Loading indicator */
+#loading {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  background: #222;
+  padding: 8px 10px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  z-index: 999;
+  font-size: 12px;
+  color: #0ff;
+}
+</style>
 </head>
-
 <body>
-  <h1>Beets Album Status</h1>
+<h1>Beets Album Status</h1>
 
-  <!-- ?? TOP SECTION -->
-  <div class="top-container">
-    <div class="box stats-box">
-      <h2>Library Stats</h2>
-      <div id="stats">
-        <div>Albums: …</div>
-        <div>Artists: …</div>
-        <div>Library: … files</div>
-        <div>Inbox: … files</div>
-      </div>
+<!-- Loading indicator -->
+<div id="loading" style="display:none;">Loading...</div>
+
+<!-- TOP containers: Stats & Controls -->
+<div class="top-container">
+  <!-- Library Stats -->
+  <div class="box stats-box">
+    <h2>Library Stats</h2>
+    <div id="stats">
+      <div>Tracks: …</div>
+      <div>Albums: …</div>
+      <div>Artists: …</div>
+      <div>Album artists: …</div>
+      <div>Total time: …</div>
+      <div>Total size: …</div>
     </div>
+  </div>
+  <!-- Controls -->
+  <div class="box controls-box">
+    <h2>Import Controls</h2>
+    <div>
+      <button id="importBtn">Import Inbox</button>
+      <button id="reimportBtn">Full Re-import Library</button>
+      <button id="refreshBtn">Refresh Library</button>
+      <button id="extractBtn">Extract Covers & Refresh</button>
+    </div>
+    <div id="status">Status: Idle</div>
+  </div>
+</div>
 
-    <div class="box controls-box">
-      <h2>Import Controls</h2>
-      <div>
-        <button onclick="importInbox()">Import Inbox</button>
-        <button onclick="reimportLibrary()">Full Re-import Library</button>
-        <button onclick="refreshLibrary()">Refresh Library</button>
-        <button onclick="extractCovers()">Extract Covers & Refresh</button>
-      </div>
-      <div id="status">Status: Idle</div>
+<!-- BOTTOM containers: albums list, album grid, recent, artists, inbox -->
+<div class="bottom-container">
+  <!-- All Albums (List) -->
+  <div class="box albums-box">
+    <h2>All Albums</h2>
+    <input id="search" type="text" placeholder="Search albums or artists…" />
+    <div id="album-list"></div>
+  </div>
+
+  <!-- Album Grid -->
+  <div class="box album-grid-box">
+    <h2>Album Grid</h2>
+    <div class="album-grid-container">
+      <div id="album-grid" class="album-grid"></div>
     </div>
   </div>
 
-  <!-- ?? BOTTOM SECTION -->
-  <div class="bottom-container">
-
-    <!-- ?? ALL ALBUMS -->
-    <div class="box albums-box">
-      <h2>All Albums</h2>
-      <input id="search" type="text" placeholder="Search albums or artists…" oninput="filterAlbums()" />
-      <div id="album-list"></div>
-    </div>
-
-    <!-- ?? RECENT ALBUMS -->
-    <div class="box recent-box">
-      <h2>Recent Albums</h2>
-      <div id="recent-carousel" class="recent-carousel"></div>
-    </div>
-
-    <!-- ?? RECENT ARTISTS -->
-    <div class="box artists-box">
-      <h2>Recent Artists</h2>
-      <div id="artist-list"></div>
-    </div>
-
-    <!-- ?? INBOX -->
-    <div class="box inbox-box">
-      <h2>Inbox</h2>
-      <div id="inbox-summary">
-        <div>Tracks: <span id="inbox-tracks">–</span></div>
-        <div>Total time: <span id="inbox-time">–</span></div>
-        <div>Approximate total size: <span id="inbox-size">–</span></div>
-        <div>Artists: <span id="inbox-artists">–</span></div>
-        <div>Albums: <span id="inbox-albums">–</span></div>
-        <div>Album artists: <span id="inbox-albumartists">–</span></div>
-      </div>
-
-      <div class="inbox-note">
-        Expandable folders<br />
-        Artist<br />
-        ? Albums
-      </div>
-
-      <div id="inbox-tree"></div>
-      <div id="inbox-files"></div>
-    </div>
+  <!-- Recent Albums -->
+  <div class="box recent-box">
+    <h2>Recent Albums</h2>
+    <div id="recent-albums"></div>
   </div>
+
+  <!-- Recent Artists -->
+  <div class="box artists-box">
+    <h2>Recent Artists</h2>
+    <div id="recent-artists"></div>
+  </div>
+
+  <!-- Inbox -->
+  <div class="box inbox-box">
+    <h2>Inbox</h2>
+    <div id="inbox-summary">
+      <div>Tracks: <span id="inbox-tracks">–</span></div>
+      <div>Artists: <span id="inbox-artists">–</span></div>
+      <div>Album artists: <span id="inbox-albumartists">–</span></div>
+      <div>Albums: <span id="inbox-albums">–</span></div>
+      <div class="full-width">Total time: <span id="inbox-time">–</span></div>
+      <div class="full-width">Total size: <span id="inbox-size">–</span></div>
+    </div>
+    <div class="inbox-note">
+      Expandable folders<br />
+      Artist ? Albums ? Files
+    </div>
+    <div id="inbox-tree"></div>
+    <div id="inbox-files"></div>
+  </div>
+</div>
+
+<!-- JAVASCRIPT -->
 <script>
-  // Global state
-  let allAlbums = [];
-  let filteredAlbums = [];
-
-  /* ---------------------------------------------------------
-     COVER URL HELPER
-  --------------------------------------------------------- */
-  function coverUrlFor(album) {
-    const base =
-      (album && (album.example_path || album.path || album.folder || album.directory)) || "";
-    if (!base) return "/placeholder.jpg";
-    return encodeURI(base.replace(/\/$/, "") + "/cover.jpg");
+  // Utility functions
+  function showLoading() {
+    document.getElementById("loading").style.display = "block";
   }
-
-  /* ---------------------------------------------------------
-     LIBRARY STATS
-  --------------------------------------------------------- */
-  function renderStats(stats) {
-    const el = document.getElementById("stats");
-    if (!el) return;
-    el.innerHTML = "";
-    const add = (label, value) => {
-      const div = document.createElement("div");
-      div.textContent = label + ": " + value;
-      el.appendChild(div);
-    };
-
-    if (stats && stats.beets_stats) {
-      add("Beets stats", "");
-      const pre = document.createElement("pre");
-      pre.style.whiteSpace = "pre-wrap";
-      pre.style.fontSize = "11px";
-      pre.textContent = stats.beets_stats;
-      el.appendChild(pre);
-    } else {
-      add("Albums", stats && stats.albums != null ? stats.albums : "-");
-      if (stats && stats.artists != null) add("Artists", stats.artists);
-      if (stats && stats.library_files != null) add("Library", stats.library_files + " files");
-      if (stats && stats.inbox_files != null) add("Inbox", stats.inbox_files + " files");
-    }
+  function hideLoading() {
+    document.getElementById("loading").style.display = "none";
   }
-
-  /* ---------------------------------------------------------
-     SAFE HELPERS
-  --------------------------------------------------------- */
+  function setStatus(msg) {
+    document.getElementById("status").textContent = "Status: " + msg;
+  }
   function _safe(v) {
     return v === undefined || v === null || v === "" ? "-" : String(v);
   }
-
-  /* ---------------------------------------------------------
-     INBOX: stats, tree, folder contents
-  --------------------------------------------------------- */
-  function renderInboxStats(data) {
-    document.getElementById("inbox-tracks").textContent = _safe(data && data.tracks);
-    document.getElementById("inbox-time").textContent = _safe(data && data.total_time);
-    document.getElementById("inbox-size").textContent = _safe(data && data.total_size);
-    document.getElementById("inbox-artists").textContent = _safe(data && data.artists);
-    document.getElementById("inbox-albums").textContent = _safe(data && data.albums);
-    document.getElementById("inbox-albumartists").textContent = _safe(data && data.albumartists);
+  function fmtTimestamp(epoch) {
+    if (!epoch || epoch === 0) return "-";
+    const d = new Date(epoch * 1000);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
+    return `${y}-${m}-${day} ${hh}:${mm}`;
   }
 
+  // Format time in compact decimal format (e.g., "4.5 hours" instead of "4 hours and 30 minutes")
+  function formatCompactTime(timeStr) {
+    if (!timeStr || timeStr === "0 seconds" || timeStr === "-") return "0 hrs";
+    
+    // Parse the humanized time string
+    const weekMatch = timeStr.match(/(\d+)\s*week/);
+    const dayMatch = timeStr.match(/(\d+)\s*day/);
+    const hourMatch = timeStr.match(/(\d+)\s*hour/);
+    const minMatch = timeStr.match(/(\d+)\s*minute/);
+    const secMatch = timeStr.match(/(\d+)\s*second/);
+    
+    const weeks = weekMatch ? parseInt(weekMatch[1]) : 0;
+    const days = dayMatch ? parseInt(dayMatch[1]) : 0;
+    const hours = hourMatch ? parseInt(hourMatch[1]) : 0;
+    const minutes = minMatch ? parseInt(minMatch[1]) : 0;
+    const seconds = secMatch ? parseInt(secMatch[1]) : 0;
+    
+    // Convert everything to hours
+    const totalHours = (weeks * 7 * 24) + (days * 24) + hours + (minutes / 60) + (seconds / 3600);
+    
+    if (totalHours >= 24) {
+      const totalDays = totalHours / 24;
+      return totalDays.toFixed(1) + " days";
+    } else if (totalHours >= 1) {
+      return totalHours.toFixed(1) + " hrs";
+    } else if (minutes >= 1) {
+      return minutes + " min";
+    } else {
+      return seconds + " sec";
+    }
+  }
+
+  // Global album arrays
+  let allAlbums = [];
+  let filteredAlbums = [];
+
+  // Load library stats - UPDATED TO READ FROM data.library
+  async function loadStats() {
+    showLoading();
+    try {
+      const res = await fetch("/api/stats");
+      if (!res.ok) throw new Error("status " + res.status);
+      const data = await res.json();
+      const lib = data.library || {};
+      const statsDiv = document.getElementById("stats");
+      statsDiv.innerHTML = "";
+      const add = (label, value) => {
+        const div = document.createElement("div");
+        div.textContent = label + ": " + value;
+        statsDiv.appendChild(div);
+      };
+      add("Tracks", lib.tracks ?? "-");
+      add("Albums", lib.albums ?? "-");
+      add("Artists", lib.artists ?? "-");
+      add("Album artists", lib.album_artists ?? "-");
+      add("Total time", lib.total_time ?? "-");
+      add("Total size", lib.total_size ?? "-");
+    } catch (e) {
+      console.error("loadStats error", e);
+    } finally {
+      hideLoading();
+    }
+  }
+
+  // Inbox stats
   async function loadInboxStats() {
     try {
       const res = await fetch("/api/inbox/stats");
       if (!res.ok) throw new Error("status " + res.status);
       const data = await res.json();
-      renderInboxStats(data);
+      document.getElementById("inbox-tracks").textContent = _safe(data?.tracks);
+      document.getElementById("inbox-time").textContent = formatCompactTime(data?.total_time);
+      document.getElementById("inbox-size").textContent = _safe(data?.total_size);
+      document.getElementById("inbox-artists").textContent = _safe(data?.artists);
+      document.getElementById("inbox-albums").textContent = _safe(data?.albums);
+      document.getElementById("inbox-albumartists").textContent = _safe(data?.album_artists);
     } catch (err) {
       console.error("loadInboxStats:", err);
-      renderInboxStats({});
     }
   }
 
+  // Inbox tree rendering
   function renderInboxTree(tree) {
     const container = document.getElementById("inbox-tree");
-    if (!container) return;
     container.innerHTML = "";
-
     if (!tree || Object.keys(tree).length === 0) {
       const p = document.createElement("div");
       p.style.color = "#666";
@@ -375,7 +581,6 @@
       container.appendChild(p);
       return;
     }
-
     for (const artist of Object.keys(tree).sort((a, b) => a.localeCompare(b))) {
       const artistDiv = document.createElement("div");
       artistDiv.className = "inbox-artist";
@@ -384,8 +589,7 @@
       const albumList = document.createElement("div");
       albumList.className = "inbox-albums";
 
-      const albums = Array.isArray(tree[artist]) ? tree[artist] : [];
-      albums.forEach(album => {
+      (tree[artist] || []).forEach((album) => {
         const albumDiv = document.createElement("div");
         albumDiv.className = "inbox-album";
         albumDiv.textContent = "? " + album;
@@ -404,39 +608,11 @@
       const res = await fetch("/api/inbox/tree");
       if (!res.ok) throw new Error("status " + res.status);
       const data = await res.json();
-      const tree = data && data.folders ? data.folders : (data || {});
-      renderInboxTree(tree);
+      renderInboxTree(data.folders || data);
     } catch (err) {
       console.error("loadInboxTree:", err);
       renderInboxTree({});
     }
-  }
-
-  function renderInboxFiles(artist, album, files) {
-    const container = document.getElementById("inbox-files");
-    if (!container) return;
-    const safeFiles = Array.isArray(files) ? files : [];
-    container.innerHTML = "";
-
-    const title = document.createElement("h3");
-    title.textContent = `${artist} — ${album}`;
-    container.appendChild(title);
-
-    if (safeFiles.length === 0) {
-      const p = document.createElement("div");
-      p.style.color = "#666";
-      p.textContent = "No files found in this folder.";
-      container.appendChild(p);
-      return;
-    }
-
-    const list = document.createElement("ul");
-    safeFiles.forEach(f => {
-      const li = document.createElement("li");
-      li.textContent = f;
-      list.appendChild(li);
-    });
-    container.appendChild(list);
   }
 
   async function loadInboxFolder(artist, album) {
@@ -452,15 +628,58 @@
     }
   }
 
-  /* ---------------------------------------------------------
-     ALBUM LIST
-  --------------------------------------------------------- */
+  function renderInboxFiles(artist, album, files) {
+    const container = document.getElementById("inbox-files");
+    container.innerHTML = "";
+    const title = document.createElement("h3");
+    title.textContent = `${artist} — ${album}`;
+    container.appendChild(title);
+
+    if (!files || files.length === 0) {
+      const p = document.createElement("div");
+      p.style.color = "#666";
+      p.textContent = "No files found in this folder.";
+      container.appendChild(p);
+      return;
+    }
+
+    const list = document.createElement("ul");
+    files.forEach((f) => {
+      const li = document.createElement("li");
+      li.textContent = f;
+      list.appendChild(li);
+    });
+    container.appendChild(list);
+  }
+
+  // Load all albums
+  async function loadAlbums() {
+    showLoading();
+    try {
+      const res = await fetch("/data/albums.json");
+      if (!res.ok) throw new Error("status " + res.status);
+      const data = await res.json();
+      allAlbums = Array.isArray(data) ? data.sort((a, b) => (b._mtime || 0) - (a._mtime || 0)) : [];
+      filteredAlbums = allAlbums.slice();
+      renderAlbums();
+      renderAlbumGrid(allAlbums);
+
+      const recent = allAlbums.slice(0, 40);
+      renderRecentAlbums(recent);
+      renderRecentArtists(allAlbums);
+    } catch (e) {
+      console.error("loadAlbums error", e);
+    } finally {
+      hideLoading();
+    }
+  }
+
+  // Album list rendering
   function renderAlbums() {
     const list = document.getElementById("album-list");
     if (!list) return;
     list.innerHTML = "";
-
-    filteredAlbums.forEach(a => {
+    for (const a of filteredAlbums) {
       const row = document.createElement("div");
       row.className = "album-row";
 
@@ -479,44 +698,83 @@
       row.appendChild(title);
       row.appendChild(meta);
       list.appendChild(row);
+    }
+  }
+
+  // Album grid rendering
+  function renderAlbumGrid(albums) {
+    const grid = document.getElementById("album-grid");
+    if (!grid) return;
+    grid.innerHTML = "";
+    const toRender = Array.isArray(albums) ? albums : [];
+    toRender.forEach((a) => {
+      const item = document.createElement("div");
+      item.className = "album-grid-item";
+
+      const coverDiv = document.createElement("div");
+      coverDiv.className = "album-grid-cover";
+
+      const img = document.createElement("img");
+      img.src = coverUrlFor(a);
+      img.onerror = () => {
+        img.onerror = null;
+        img.src = "/static/placeholder.jpg";
+      };
+      coverDiv.appendChild(img);
+
+      const title = document.createElement("div");
+      title.className = "album-grid-title";
+      title.textContent = a.album || "(Unknown album)";
+
+      const meta = document.createElement("div");
+      meta.className = "album-grid-meta";
+      const bits = [];
+      if (a.albumartist) bits.push(a.albumartist);
+      else if (a.artist) bits.push(a.artist);
+      if (a.year) bits.push(a.year);
+      meta.textContent = bits.join(" • ") || "-";
+
+      item.appendChild(coverDiv);
+      item.appendChild(title);
+      item.appendChild(meta);
+      grid.appendChild(item);
     });
   }
 
-  /* ---------------------------------------------------------
-     SEARCH
-  --------------------------------------------------------- */
+  // Search filter
   function filterAlbums() {
     const q = (document.getElementById("search")?.value || "").toLowerCase().trim();
     if (!q) {
       filteredAlbums = allAlbums.slice();
     } else {
-      filteredAlbums = allAlbums.filter(a => {
+      filteredAlbums = allAlbums.filter((a) => {
         const hay = ((a.album || "") + " " + (a.albumartist || a.artist || "")).toLowerCase();
         return hay.includes(q);
       });
     }
     renderAlbums();
+    renderAlbumGrid(filteredAlbums);
   }
 
-  /* ---------------------------------------------------------
-     RECENT ALBUMS
-  --------------------------------------------------------- */
+  // Render recent albums
   function renderRecentAlbums(albums) {
-    const container = document.getElementById("recent-carousel");
+    const MAX = 40;
+    const container = document.getElementById("recent-albums");
     if (!container) return;
     container.innerHTML = "";
-
-    albums.forEach(a => {
+    const toRender = Array.isArray(albums) ? albums.slice(0, MAX) : [];
+    toRender.forEach((a) => {
       const item = document.createElement("div");
       item.className = "recent-item";
 
       const coverDiv = document.createElement("div");
       coverDiv.className = "recent-cover";
+
       const img = document.createElement("img");
       img.src = coverUrlFor(a);
-      img.onerror = function () {
-        this.onerror = null;
-        this.src = "/placeholder.jpg";
+      img.onerror = () => {
+        img.onerror = null;
+        img.src = "/static/placeholder.jpg";
       };
       coverDiv.appendChild(img);
 
@@ -524,65 +782,69 @@
       title.className = "recent-title";
       title.textContent = a.album || "(Unknown album)";
 
-      const artist = document.createElement("div");
-      artist.className = "recent-artist";
-      artist.textContent = a.albumartist || a.artist || "";
+      const metaRow = document.createElement("div");
+      metaRow.className = "recent-meta";
+
+      const artistDiv = document.createElement("div");
+      artistDiv.className = "recent-artist";
+      artistDiv.textContent = a.albumartist || a.artist || "";
+
+      const ts = document.createElement("div");
+      ts.className = "recent-ts";
+      ts.textContent = fmtTimestamp(a._mtime);
+
+      metaRow.appendChild(artistDiv);
+      metaRow.appendChild(ts);
 
       item.appendChild(coverDiv);
       item.appendChild(title);
-      item.appendChild(artist);
+      item.appendChild(metaRow);
       container.appendChild(item);
     });
+    if (Array.isArray(albums) && albums.length > MAX) {
+      const footer = document.createElement("div");
+      footer.style.marginTop = "8px";
+      footer.style.fontSize = "13px";
+      footer.style.color = "#666";
+      footer.textContent = `Showing ${MAX} of ${albums.length} recent albums`;
+      container.appendChild(footer);
+    }
   }
 
-  /* ---------------------------------------------------------
-     RECENT ARTISTS
-  --------------------------------------------------------- */
-  function renderRecentArtistsFromAlbums(albums) {
-    const recentAlbums = Array.isArray(albums) ? albums.slice().reverse() : [];
-    const map = new Map();
-
-    for (const a of recentAlbums) {
+  // Render recent artists
+  function renderRecentArtists(albums) {
+    const recentArtists = [];
+    const seen = new Set();
+    for (const a of albums) {
       const name = a.albumartist || a.artist || "(Unknown artist)";
-      if (!map.has(name)) {
-        map.set(name, { count: 1, sample: a });
-      } else {
-        map.get(name).count += 1;
+      if (!seen.has(name)) {
+        seen.add(name);
+        recentArtists.push(a);
+        if (recentArtists.length >= 40) break;
       }
     }
-
-    const artists = Array.from(map.entries())
-      .map(([name, info]) => ({
-        name,
-        count: info.count,
-        sample: info.sample
-      }))
-      .slice(0, 10);
-
-    const container = document.getElementById("artist-list");
+    const container = document.getElementById("recent-artists");
     if (!container) return;
     container.innerHTML = "";
-
-    artists.forEach(a => {
+    recentArtists.forEach((a) => {
       const row = document.createElement("div");
       row.className = "artist-row";
 
       const img = document.createElement("img");
-      img.src = coverUrlFor(a.sample);
-      img.onerror = function () {
-        this.onerror = null;
-        this.src = "/placeholder.jpg";
+      img.src = coverUrlFor(a);
+      img.onerror = () => {
+        img.onerror = null;
+        img.src = "/static/placeholder.jpg";
       };
 
       const textWrap = document.createElement("div");
-
       const nameDiv = document.createElement("div");
       nameDiv.className = "artist-name";
-      nameDiv.textContent = a.name;
+      nameDiv.textContent = a.albumartist || a.artist || "";
 
       const metaDiv = document.createElement("div");
       metaDiv.className = "artist-meta";
-      metaDiv.textContent = a.count + (a.count === 1 ? " album" : " albums");
+      metaDiv.textContent = "• " + (a.albumartist || a.artist || "");
 
       textWrap.appendChild(nameDiv);
       textWrap.appendChild(metaDiv);
@@ -593,111 +855,92 @@
     });
   }
 
-  /* ---------------------------------------------------------
-     LOADERS
-  --------------------------------------------------------- */
-  async function loadStats() {
-    try {
-      const res = await fetch("/api/stats");
-      if (!res.ok) throw new Error("status " + res.status);
-      const data = await res.json();
-      renderStats(data);
-    } catch (e) {
-      console.error("stats error", e);
+  // Helper for cover URL
+  function coverUrlFor(album) {
+    if (album && album.folder) {
+      return "/music/library" + album.folder + "/cover.jpg";
     }
+    return "/static/placeholder.jpg";
   }
 
-  async function loadAlbums() {
-    try {
-      const res = await fetch("/data/albums.json");
-      if (!res.ok) throw new Error("status " + res.status);
-      const data = await res.json();
-      allAlbums = Array.isArray(data) ? data : [];
-      filteredAlbums = allAlbums.slice();
-      renderAlbums();
-
-      const recent = allAlbums.slice(-12).reverse();
-      renderRecentAlbums(recent);
-
-      renderRecentArtistsFromAlbums(allAlbums);
-    } catch (e) {
-      console.error("albums error", e);
-    }
-  }
-
-  /* ---------------------------------------------------------
-     IMPORT / REFRESH
-  --------------------------------------------------------- */
+  // Button actions
   async function importInbox() {
     setStatus("Importing inbox...");
     try {
       const res = await fetch("/api/library/import", { method: "POST" });
       const data = await res.json();
-      setStatus("Import started: " + (data.detail || data.status || "ok"));
+      setStatus("Import started: " + (data.detail || data.status || ""));
     } catch (e) {
       console.error(e);
-      setStatus("Import failed: " + e);
+      setStatus("Import failed");
     }
   }
 
   async function reimportLibrary() {
-    setStatus("Full re-import (using refresh) started...");
+    setStatus("Full Re-import...");
     try {
       const res = await fetch("/api/library/refresh", { method: "POST" });
-      const data = await res.json();
-      setStatus("Re-import/refresh done: " + (data.detail || data.status || "ok"));
+      await res.json();
+      setStatus("Re-import/refresh done");
       await loadAlbums();
     } catch (e) {
       console.error(e);
-      setStatus("Re-import failed: " + e);
+      setStatus("Re-import failed");
     }
   }
 
   async function refreshLibrary() {
-    setStatus("Refreshing library...");
+    setStatus("Refreshing...");
     try {
       const res = await fetch("/api/library/refresh", { method: "POST" });
-      const data = await res.json();
-      setStatus("Refresh done: " + (data.detail || data.status || "ok"));
+      await res.json();
+      setStatus("Refresh done");
       await loadAlbums();
     } catch (e) {
       console.error(e);
-      setStatus("Refresh failed: " + e);
+      setStatus("Refresh failed");
     }
   }
 
   async function extractCovers() {
-    setStatus("Extracting covers & refreshing...");
+    setStatus("Extracting covers...");
     try {
       const res = await fetch("/api/library/refresh", { method: "POST" });
-      const data = await res.json();
-      setStatus("Covers/refresh done: " + (data.detail || data.status || "ok"));
+      await res.json();
+      setStatus("Covers extracted");
       await loadAlbums();
     } catch (e) {
       console.error(e);
-      setStatus("Extract covers failed: " + e);
+      setStatus("Extract failed");
     }
   }
 
-  function setStatus(msg) {
-    const el = document.getElementById("status");
-    if (el) el.textContent = "Status: " + msg;
-  }
-
-  /* ---------------------------------------------------------
-     PAGE INIT (single listener)
-  --------------------------------------------------------- */
-  window.addEventListener("DOMContentLoaded", () => {
+  // Initialize on DOM load
+  document.addEventListener("DOMContentLoaded", () => {
     loadStats();
-    loadAlbums();
     loadInboxStats();
     loadInboxTree();
+    loadAlbums();
 
-    const searchEl = document.getElementById("search");
-    if (searchEl) searchEl.addEventListener("input", filterAlbums);
+    // Bind buttons
+    document.getElementById("importBtn").onclick = importInbox;
+    document.getElementById("reimportBtn").onclick = reimportLibrary;
+    document.getElementById("refreshBtn").onclick = refreshLibrary;
+    document.getElementById("extractBtn").onclick = extractCovers;
+
+    // Search binding
+    const searchInput = document.getElementById("search");
+    if (searchInput) {
+      searchInput.addEventListener("input", filterAlbums);
+    }
+
+    // Periodic refresh of stats/inbox
+    setInterval(() => {
+      loadStats();
+      loadInboxStats();
+      loadInboxTree();
+    }, 60000);
   });
 </script>
-
 </body>
 </html>
-

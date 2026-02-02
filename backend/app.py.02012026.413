@@ -373,7 +373,7 @@ class DebouncedHandler(FileSystemEventHandler):
         label:          Human-readable name used in log messages.
     """
 
-    def __init__(self, queue, lock, queued, debounce, label, path_prefix=None, ignore_dirs=None):
+    def __init__(self, queue, lock, queued, debounce, label, path_prefix=None):
         super().__init__()
         self._queue = queue
         self._lock = lock
@@ -381,10 +381,6 @@ class DebouncedHandler(FileSystemEventHandler):
         self._debounce = debounce
         self._label = label
         self._path_prefix = str(path_prefix) if path_prefix else None
-        # Basename prefixes: any path whose final component starts with one of
-        # these strings is silently dropped (e.g. "_UNPACK_" catches all per-album
-        # unpack temp directories without needing to know their full names).
-        self._ignore_prefixes = set(ignore_dirs or [])
         self._last_seen = {}
 
     def on_any_event(self, event):
@@ -392,13 +388,6 @@ class DebouncedHandler(FileSystemEventHandler):
             src = event.src_path
             target = src if os.path.isdir(src) else os.path.dirname(src)
             target = os.path.normpath(target)
-
-            # Drop anything whose basename starts with an ignored prefix
-            # (e.g. "_UNPACK_" catches all per-album unpack temp dirs)
-            if self._ignore_prefixes:
-                base_check = os.path.basename(target)
-                if any(base_check.startswith(pfx) for pfx in self._ignore_prefixes):
-                    return
 
             # Optional prefix filter (library & cover watchers)
             if self._path_prefix and not target.startswith(self._path_prefix):
@@ -483,7 +472,7 @@ def library_worker():
                 if ok:
                     success = True
                 else:
-                    # 2) Strip trailing bracketed suffixes
+                    # 2) Strip trailing bracketed suffixes - REGEX FIXED HERE
                     t2 = re.sub(r'\s*\[\d+\]$', '', target)
                     if t2 != target and os.path.exists(t2):
                         cmd2 = ["python3", REGEN_SCRIPT, t2]
@@ -538,9 +527,11 @@ def cover_worker():
             cover_path = album_dir / "cover.jpg"
 
             if not album_dir.exists() or not album_dir.is_dir():
+                cover_q.task_done()
                 continue
 
             if cover_path.exists():
+                cover_q.task_done()
                 continue
 
             logger.info("Fetching cover art for %s", album_dir)
@@ -574,7 +565,6 @@ def start_watchers():
             queued=inbox_queued,
             debounce=DEBOUNCE_INBOX,
             label="Inbox",
-            ignore_dirs=["_UNPACK_"],
         )
         # Piggyback cache invalidation on the same handler
         _orig_on_any = inbox_handler.on_any_event

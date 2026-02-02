@@ -49,6 +49,12 @@ button:hover {
   background: #f0a;
   transform: scale(1.02);
 }
+button:disabled {
+  background: #555;
+  border-color: #555;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
 
 /* Layout containers */
 .top-container {
@@ -123,7 +129,7 @@ button:hover {
 /* Album grid */
 .album-grid-container {
   overflow-y: auto;
-  max-height: calc(100vh - 200px);
+  max-height: calc(100vh - 250px);
 }
 .album-grid {
   display: grid;
@@ -180,6 +186,28 @@ button:hover {
   width: 100%;
 }
 
+/* Pagination controls */
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid #333;
+}
+.pagination-info {
+  font-size: 12px;
+  color: #999;
+}
+.pagination-buttons {
+  display: flex;
+  gap: 4px;
+}
+.pagination-buttons button {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
 /* Recent albums */
 .recent-box {
   width: 160px; /* choose your width */ 
@@ -193,7 +221,7 @@ button:hover {
 }
 #recent-albums {
   overflow-y: auto;
-  max-height: calc(100vh - 200px);
+  max-height: calc(100vh - 250px);
 }
 .recent-item {
   display: flex;
@@ -396,7 +424,6 @@ button:hover {
       <div>Tracks: …</div>
       <div>Albums: …</div>
       <div>Artists: …</div>
-      <div>Album artists: …</div>
       <div>Total time: …</div>
       <div>Total size: …</div>
     </div>
@@ -429,12 +456,24 @@ button:hover {
     <div class="album-grid-container">
       <div id="album-grid" class="album-grid"></div>
     </div>
+    <div class="pagination" id="grid-pagination">
+      <div class="pagination-info" id="grid-page-info"></div>
+      <div class="pagination-buttons">
+        <button id="grid-load-more">Load More</button>
+      </div>
+    </div>
   </div>
 
   <!-- Recent Albums -->
   <div class="box recent-box">
     <h2>Recent Albums</h2>
     <div id="recent-albums"></div>
+    <div class="pagination" id="recent-pagination">
+      <div class="pagination-info" id="recent-page-info"></div>
+      <div class="pagination-buttons">
+        <button id="recent-load-more">Load More</button>
+      </div>
+    </div>
   </div>
 
   <!-- Recent Artists -->
@@ -449,7 +488,6 @@ button:hover {
     <div id="inbox-summary">
       <div>Tracks: <span id="inbox-tracks">–</span></div>
       <div>Artists: <span id="inbox-artists">–</span></div>
-      <div>Album artists: <span id="inbox-albumartists">–</span></div>
       <div>Albums: <span id="inbox-albums">–</span></div>
       <div class="full-width">Total time: <span id="inbox-time">–</span></div>
       <div class="full-width">Total size: <span id="inbox-size">–</span></div>
@@ -524,15 +562,19 @@ button:hover {
   // Global album arrays
   let allAlbums = [];
   let filteredAlbums = [];
+  
+  // Load more state - tracks how many items to display
+  const PAGE_SIZE = 20;
+  let gridItemsToShow = PAGE_SIZE;
+  let recentItemsToShow = PAGE_SIZE;
 
-  // Load library stats - UPDATED TO READ FROM data.library
+  // Load library stats
   async function loadStats() {
     showLoading();
     try {
       const res = await fetch("/api/stats");
       if (!res.ok) throw new Error("status " + res.status);
       const data = await res.json();
-      const lib = data.library || {};
       const statsDiv = document.getElementById("stats");
       statsDiv.innerHTML = "";
       const add = (label, value) => {
@@ -540,12 +582,11 @@ button:hover {
         div.textContent = label + ": " + value;
         statsDiv.appendChild(div);
       };
-      add("Tracks", lib.tracks ?? "-");
-      add("Albums", lib.albums ?? "-");
-      add("Artists", lib.artists ?? "-");
-      add("Album artists", lib.album_artists ?? "-");
-      add("Total time", lib.total_time ?? "-");
-      add("Total size", lib.total_size ?? "-");
+      add("Tracks", data.tracks ?? "-");
+      add("Albums", data.albums ?? "-");
+      add("Artists", data.album_artists ?? "-");
+      add("Total time", data.total_time ?? "-");
+      add("Total size", data.total_size ?? "-");
     } catch (e) {
       console.error("loadStats error", e);
     } finally {
@@ -564,7 +605,6 @@ button:hover {
       document.getElementById("inbox-size").textContent = _safe(data?.total_size);
       document.getElementById("inbox-artists").textContent = _safe(data?.artists);
       document.getElementById("inbox-albums").textContent = _safe(data?.albums);
-      document.getElementById("inbox-albumartists").textContent = _safe(data?.album_artists);
     } catch (err) {
       console.error("loadInboxStats:", err);
     }
@@ -661,11 +701,14 @@ button:hover {
       const data = await res.json();
       allAlbums = Array.isArray(data) ? data.sort((a, b) => (b._mtime || 0) - (a._mtime || 0)) : [];
       filteredAlbums = allAlbums.slice();
+      
+      // Reset to initial load amount
+      gridItemsToShow = PAGE_SIZE;
+      recentItemsToShow = PAGE_SIZE;
+      
       renderAlbums();
-      renderAlbumGrid(allAlbums);
-
-      const recent = allAlbums.slice(0, 40);
-      renderRecentAlbums(recent);
+      renderAlbumGrid();
+      renderRecentAlbums();
       renderRecentArtists(allAlbums);
     } catch (e) {
       console.error("loadAlbums error", e);
@@ -701,13 +744,17 @@ button:hover {
     }
   }
 
-  // Album grid rendering
-  function renderAlbumGrid(albums) {
+  // Album grid rendering with load more
+  function renderAlbumGrid() {
     const grid = document.getElementById("album-grid");
     if (!grid) return;
     grid.innerHTML = "";
-    const toRender = Array.isArray(albums) ? albums : [];
-    toRender.forEach((a) => {
+    
+    const albums = filteredAlbums;
+    const itemsToDisplay = Math.min(gridItemsToShow, albums.length);
+    const pageAlbums = albums.slice(0, itemsToDisplay);
+    
+    pageAlbums.forEach((a) => {
       const item = document.createElement("div");
       item.className = "album-grid-item";
 
@@ -739,6 +786,19 @@ button:hover {
       item.appendChild(meta);
       grid.appendChild(item);
     });
+    
+    // Update load more info
+    const pageInfo = document.getElementById("grid-page-info");
+    if (pageInfo) {
+      pageInfo.textContent = `Showing ${itemsToDisplay} of ${albums.length}`;
+    }
+    
+    // Update button state
+    const loadMoreBtn = document.getElementById("grid-load-more");
+    if (loadMoreBtn) {
+      loadMoreBtn.disabled = itemsToDisplay >= albums.length;
+      loadMoreBtn.textContent = itemsToDisplay >= albums.length ? "All Loaded" : "Load More";
+    }
   }
 
   // Search filter
@@ -752,18 +812,22 @@ button:hover {
         return hay.includes(q);
       });
     }
+    gridItemsToShow = PAGE_SIZE; // Reset to initial amount when searching
     renderAlbums();
-    renderAlbumGrid(filteredAlbums);
+    renderAlbumGrid();
   }
 
-  // Render recent albums
-  function renderRecentAlbums(albums) {
-    const MAX = 40;
+  // Render recent albums with load more
+  function renderRecentAlbums() {
     const container = document.getElementById("recent-albums");
     if (!container) return;
     container.innerHTML = "";
-    const toRender = Array.isArray(albums) ? albums.slice(0, MAX) : [];
-    toRender.forEach((a) => {
+    
+    const albums = allAlbums;
+    const itemsToDisplay = Math.min(recentItemsToShow, albums.length);
+    const pageAlbums = albums.slice(0, itemsToDisplay);
+    
+    pageAlbums.forEach((a) => {
       const item = document.createElement("div");
       item.className = "recent-item";
 
@@ -801,13 +865,18 @@ button:hover {
       item.appendChild(metaRow);
       container.appendChild(item);
     });
-    if (Array.isArray(albums) && albums.length > MAX) {
-      const footer = document.createElement("div");
-      footer.style.marginTop = "8px";
-      footer.style.fontSize = "13px";
-      footer.style.color = "#666";
-      footer.textContent = `Showing ${MAX} of ${albums.length} recent albums`;
-      container.appendChild(footer);
+    
+    // Update load more info
+    const pageInfo = document.getElementById("recent-page-info");
+    if (pageInfo) {
+      pageInfo.textContent = `Showing ${itemsToDisplay} of ${albums.length}`;
+    }
+    
+    // Update button state
+    const loadMoreBtn = document.getElementById("recent-load-more");
+    if (loadMoreBtn) {
+      loadMoreBtn.disabled = itemsToDisplay >= albums.length;
+      loadMoreBtn.textContent = itemsToDisplay >= albums.length ? "All Loaded" : "Load More";
     }
   }
 
@@ -915,6 +984,17 @@ button:hover {
     }
   }
 
+  // Load more handlers
+  function gridLoadMore() {
+    gridItemsToShow += PAGE_SIZE;
+    renderAlbumGrid();
+  }
+
+  function recentLoadMore() {
+    recentItemsToShow += PAGE_SIZE;
+    renderRecentAlbums();
+  }
+
   // Initialize on DOM load
   document.addEventListener("DOMContentLoaded", () => {
     loadStats();
@@ -927,6 +1007,10 @@ button:hover {
     document.getElementById("reimportBtn").onclick = reimportLibrary;
     document.getElementById("refreshBtn").onclick = refreshLibrary;
     document.getElementById("extractBtn").onclick = extractCovers;
+
+    // Bind load more buttons
+    document.getElementById("grid-load-more").onclick = gridLoadMore;
+    document.getElementById("recent-load-more").onclick = recentLoadMore;
 
     // Search binding
     const searchInput = document.getElementById("search");

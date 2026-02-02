@@ -19,6 +19,7 @@ services:
       - /srv/dev-disk-by-uuid-306c14f2-0239-4b1e-8775-915dfdd88bd0/NVME/Docket_Configs/beets-replacement-5/config:/config:rw
       - /srv/dev-disk-by-uuid-901efa52-2e9a-4fdd-a53c-08b891fb8458/SnapRaid_mergerfs/Beets-Flask/clean:/music/library
       - /srv/dev-disk-by-uuid-901efa52-2e9a-4fdd-a53c-08b891fb8458/SnapRaid_mergerfs/Downloads/Audio:/music/inbox
+      - /srv/dev-disk-by-uuid-901efa52-2e9a-4fdd-a53c-08b891fb8458/SnapRaid_mergerfs/Beets-Flask/quarantine:/music/quarantine
       - ./data:/data:rw
       - ./data:/app/data:rw
       - ./backend:/app/backend:rw

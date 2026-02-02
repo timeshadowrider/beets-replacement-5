@@ -11,26 +11,71 @@
 body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   margin: 0;
-  padding: 16px;
+  padding: 0;
   background-color: #121212;
   color: #eee;
+}
+
+/* ==================== NAV TABS ==================== */
+
+.nav-tabs {
+  display: flex;
+  background: #1a1a1a;
+  border-bottom: 1px solid #333;
+  padding: 0 16px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.nav-tab {
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #888;
+  cursor: pointer;
+  border: none;
+  background: none;
+  border-bottom: 3px solid transparent;
+  transition: color 0.2s, border-color 0.2s;
+  margin: 0;
+  border-radius: 0;
+  transform: none;
+}
+.nav-tab:hover {
+  color: #ccc;
+  transform: none;
+  background: none;
+}
+.nav-tab.active {
+  color: #0ff;
+  border-bottom-color: #0ff;
+}
+
+/* ==================== PAGE CONTENT ==================== */
+
+.page {
+  display: none;
+  padding: 16px;
+}
+.page.active {
+  display: block;
 }
 
 /* Headings */
 h1 {
   margin-top: 0;
   margin-bottom: 12px;
-  color: #f0f; /* neon pink */
+  color: #f0f;
 }
 h2 {
   margin: 0 0 8px 0;
   font-size: 16px;
-  color: #0ff; /* cyan */
+  color: #0ff;
 }
 h3 {
   margin: 0 0 8px 0;
   font-size: 14px;
-  color: #0cc; /* darker cyan */
+  color: #0cc;
 }
 
 /* Buttons */
@@ -39,7 +84,7 @@ button {
   padding: 6px 10px;
   font-size: 13px;
   cursor: pointer;
-  background: #f0f; /* neon pink */
+  background: #f0f;
   border: 1px solid #f0f;
   border-radius: 4px;
   color: #fff;
@@ -65,7 +110,7 @@ button:disabled {
 }
 .bottom-container {
   display: grid;
-  grid-template-columns: 260px 1fr 1fr 260px 260px; /* 5 columns: list, grid, recent, artists, inbox */
+  grid-template-columns: 260px 1fr 260px 260px;
   gap: 16px;
 }
 
@@ -84,12 +129,6 @@ button:disabled {
   font-size: 13px;
   color: #eee;
 }
-.stats-box pre {
-  white-space: pre-wrap;
-  font-size: 11px;
-  margin: 0;
-  color: #66f;
-}
 #status {
   margin-top: 8px;
   font-size: 13px;
@@ -102,12 +141,8 @@ button:disabled {
   flex-direction: column;
   overflow: hidden;
 }
-.albums-box h2 {
-  flex-shrink: 0;
-}
-#search {
-  flex-shrink: 0;
-}
+.albums-box h2 { flex-shrink: 0; }
+#search { flex-shrink: 0; }
 #album-list {
   overflow-y: auto;
   max-height: calc(100vh - 200px);
@@ -133,7 +168,7 @@ button:disabled {
 }
 .album-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr); /* 4 columns for 120px images */
+  grid-template-columns: repeat(4, 1fr);
   gap: 8px;
 }
 .album-grid-item {
@@ -195,92 +230,17 @@ button:disabled {
   padding-top: 8px;
   border-top: 1px solid #333;
 }
-.pagination-info {
-  font-size: 12px;
-  color: #999;
-}
-.pagination-buttons {
-  display: flex;
-  gap: 4px;
-}
-.pagination-buttons button {
-  padding: 4px 8px;
-  font-size: 12px;
-}
+.pagination-info { font-size: 12px; color: #999; }
+.pagination-buttons { display: flex; gap: 4px; }
+.pagination-buttons button { padding: 4px 8px; font-size: 12px; }
 
-/* Recent albums */
-.recent-box {
-  width: 160px; /* choose your width */ 
-  flex: 0 0 160px; /* prevents flex resizing */
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-.recent-box h2 {
-  flex-shrink: 0;
-}
-#recent-albums {
-  overflow-y: auto;
-  max-height: calc(100vh - 250px);
-}
-.recent-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  font-size: 11px;
-  text-align: center;
-  color: #eee;
-  margin-bottom: 10px;
-}
-.recent-cover {
-  width: 120px;
-  height: 120px;
-  background: #111;
-  border: 1px solid #555;
-  margin-bottom: 6px;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  flex-shrink: 0;
-}
-.recent-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.recent-title {
-  font-weight: 500;
-  font-size: 11px;
-  line-height: 1.3;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  width: 100%;
-}
-.recent-meta {
-  display: flex;
-  justify-content: space-between;
-  gap: 6px;
-  align-items: center;
-  margin-top: 4px;
-  font-size: 10px;
-  color: #ccc;
-  width: 100%;
-}
-
-/* Recent artists */
+/* Recent Artists */
 .artists-box {
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
-.artists-box h2 {
-  flex-shrink: 0;
-}
+.artists-box h2 { flex-shrink: 0; }
 #recent-artists {
   overflow-y: auto;
   max-height: calc(100vh - 200px);
@@ -300,15 +260,8 @@ button:disabled {
   background: #222;
   flex-shrink: 0;
 }
-.artist-name {
-  font-weight: 500;
-  color: #eee;
-  font-size: 12px;
-}
-.artist-meta {
-  font-size: 11px;
-  color: #999;
-}
+.artist-name { font-weight: 500; color: #eee; font-size: 12px; }
+.artist-meta { font-size: 11px; color: #999; }
 
 /* Inbox */
 .inbox-box {
@@ -316,9 +269,7 @@ button:disabled {
   flex-direction: column;
   overflow: hidden;
 }
-.inbox-box h2 {
-  flex-shrink: 0;
-}
+.inbox-box h2 { flex-shrink: 0; }
 #inbox-summary {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -326,13 +277,8 @@ button:disabled {
   margin-bottom: 8px;
   flex-shrink: 0;
 }
-#inbox-summary div {
-  font-size: 13px;
-  color: #eee;
-}
-#inbox-summary .full-width {
-  grid-column: 1 / -1;
-}
+#inbox-summary div { font-size: 13px; color: #eee; }
+#inbox-summary .full-width { grid-column: 1 / -1; }
 .inbox-note {
   font-size: 12px;
   color: #999;
@@ -356,31 +302,12 @@ button:disabled {
   overflow-y: auto;
   flex-shrink: 0;
 }
-#inbox-files ul {
-  padding-left: 16px;
-  margin: 8px 0;
-}
-#inbox-files li {
-  margin-bottom: 2px;
-}
-
-/* Inbox tree items */
-.inbox-artist {
-  font-weight: 500;
-  margin-top: 4px;
-  color: #0ff;
-}
-.inbox-albums {
-  margin-left: 8px;
-}
-.inbox-album {
-  cursor: pointer;
-  color: #ccc;
-  margin: 2px 0;
-}
-.inbox-album:hover {
-  color: #fff;
-}
+#inbox-files ul { padding-left: 16px; margin: 8px 0; }
+#inbox-files li { margin-bottom: 2px; }
+.inbox-artist { font-weight: 500; margin-top: 4px; color: #0ff; }
+.inbox-albums { margin-left: 8px; }
+.inbox-album { cursor: pointer; color: #ccc; margin: 2px 0; }
+.inbox-album:hover { color: #fff; }
 
 /* Search */
 #search {
@@ -392,6 +319,7 @@ button:disabled {
   background: #111;
   color: #eee;
   font-size: 13px;
+  box-sizing: border-box;
 }
 
 /* Loading indicator */
@@ -407,624 +335,719 @@ button:disabled {
   font-size: 12px;
   color: #0ff;
 }
+
+/* ==================== ALBUMS PAGE ==================== */
+
+.albums-page-layout {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 16px;
+  height: calc(100vh - 60px);
+}
+
+/* Left sidebar: recent album list */
+.albums-sidebar {
+  background: #222;
+  border-radius: 8px;
+  border: 1px solid #333;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.albums-sidebar h2 {
+  padding: 12px 14px 0 14px;
+  flex-shrink: 0;
+}
+.albums-sidebar-list {
+  overflow-y: auto;
+  flex: 1;
+  padding: 8px 10px;
+}
+.sidebar-album-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+  border: 1px solid transparent;
+}
+.sidebar-album-item:hover {
+  background: #2a2a2a;
+}
+.sidebar-album-item.active {
+  background: #1e3a3a;
+  border-color: #0ff3;
+}
+.sidebar-album-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid #444;
+  flex-shrink: 0;
+  background: #111;
+}
+.sidebar-album-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.sidebar-album-info {
+  min-width: 0;
+  flex: 1;
+}
+.sidebar-album-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar-album-artist {
+  font-size: 11px;
+  color: #999;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar-album-year {
+  font-size: 10px;
+  color: #666;
+  flex-shrink: 0;
+}
+
+/* Right panel: tracklist */
+.albums-detail-panel {
+  background: #222;
+  border-radius: 8px;
+  border: 1px solid #333;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.albums-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border-bottom: 1px solid #333;
+  flex-shrink: 0;
+}
+.albums-detail-cover {
+  width: 100px;
+  height: 100px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #444;
+  flex-shrink: 0;
+  background: #111;
+}
+.albums-detail-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.albums-detail-info {
+  flex: 1;
+  min-width: 0;
+}
+.albums-detail-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.albums-detail-artist {
+  font-size: 14px;
+  color: #0ff;
+  margin-bottom: 4px;
+}
+.albums-detail-meta {
+  font-size: 12px;
+  color: #888;
+}
+
+/* Tracklist table */
+.tracklist-container {
+  overflow-y: auto;
+  flex: 1;
+  padding: 8px 0;
+}
+.tracklist-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.tracklist-table th {
+  text-align: left;
+  font-size: 11px;
+  color: #666;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 6px 16px;
+  border-bottom: 1px solid #333;
+  position: sticky;
+  top: 0;
+  background: #222;
+}
+.tracklist-table td {
+  padding: 8px 16px;
+  font-size: 13px;
+  color: #ccc;
+  border-bottom: 1px solid #2a2a2a;
+}
+.tracklist-table tr:last-child td {
+  border-bottom: none;
+}
+.tracklist-table tr:hover td {
+  background: #2a2a2a;
+  color: #fff;
+}
+.track-num {
+  color: #666;
+  font-size: 12px;
+  width: 32px;
+}
+.track-title {
+  font-weight: 500;
+  color: #eee;
+}
+.track-duration {
+  color: #777;
+  text-align: right;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Empty state */
+.albums-detail-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #555;
+  font-size: 14px;
+  gap: 8px;
+}
+.albums-detail-empty .empty-icon {
+  font-size: 36px;
+  opacity: 0.4;
+}
 </style>
 </head>
 <body>
-<h1>Beets Album Status</h1>
+
+<!-- NAV TABS -->
+<div class="nav-tabs">
+  <button class="nav-tab active" data-page="main">Main</button>
+  <button class="nav-tab" data-page="albums">Albums</button>
+</div>
 
 <!-- Loading indicator -->
 <div id="loading" style="display:none;">Loading...</div>
 
-<!-- TOP containers: Stats & Controls -->
-<div class="top-container">
-  <!-- Library Stats -->
-  <div class="box stats-box">
-    <h2>Library Stats</h2>
-    <div id="stats">
-      <div>Tracks: …</div>
-      <div>Albums: …</div>
-      <div>Artists: …</div>
-      <div>Total time: …</div>
-      <div>Total size: …</div>
+<!-- ==================== MAIN PAGE ==================== -->
+<div class="page active" id="page-main">
+
+  <!-- TOP: Stats & Controls -->
+  <div class="top-container">
+    <div class="box stats-box">
+      <h2>Library Stats</h2>
+      <div id="stats">
+        <div>Tracks: …</div>
+        <div>Albums: …</div>
+        <div>Artists: …</div>
+        <div>Total time: …</div>
+        <div>Total size: …</div>
+      </div>
+    </div>
+    <div class="box controls-box">
+      <h2>Import Controls</h2>
+      <div>
+        <button id="importBtn">Import Inbox</button>
+        <button id="reimportBtn">Full Re-import Library</button>
+        <button id="refreshBtn">Refresh Library</button>
+        <button id="extractBtn">Extract Covers & Refresh</button>
+      </div>
+      <div id="status">Status: Idle</div>
     </div>
   </div>
-  <!-- Controls -->
-  <div class="box controls-box">
-    <h2>Import Controls</h2>
-    <div>
-      <button id="importBtn">Import Inbox</button>
-      <button id="reimportBtn">Full Re-import Library</button>
-      <button id="refreshBtn">Refresh Library</button>
-      <button id="extractBtn">Extract Covers & Refresh</button>
+
+  <!-- BOTTOM: list, grid, artists, inbox -->
+  <div class="bottom-container">
+    <div class="box albums-box">
+      <h2>All Albums</h2>
+      <input id="search" type="text" placeholder="Search albums or artists…" />
+      <div id="album-list"></div>
     </div>
-    <div id="status">Status: Idle</div>
+
+    <div class="box album-grid-box">
+      <h2>Album Grid</h2>
+      <div class="album-grid-container">
+        <div id="album-grid" class="album-grid"></div>
+      </div>
+      <div class="pagination" id="grid-pagination">
+        <div class="pagination-info" id="grid-page-info"></div>
+        <div class="pagination-buttons">
+          <button id="grid-load-more">Load More</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="box artists-box">
+      <h2>Recent Artists</h2>
+      <div id="recent-artists"></div>
+    </div>
+
+    <div class="box inbox-box">
+      <h2>Inbox</h2>
+      <div id="inbox-summary">
+        <div>Tracks: <span id="inbox-tracks">–</span></div>
+        <div>Artists: <span id="inbox-artists">–</span></div>
+        <div>Albums: <span id="inbox-albums">–</span></div>
+        <div class="full-width">Total time: <span id="inbox-time">–</span></div>
+        <div class="full-width">Total size: <span id="inbox-size">–</span></div>
+      </div>
+      <div class="inbox-note">Expandable folders<br />Artist › Albums › Files</div>
+      <div id="inbox-tree"></div>
+      <div id="inbox-files"></div>
+    </div>
   </div>
 </div>
 
-<!-- BOTTOM containers: albums list, album grid, recent, artists, inbox -->
-<div class="bottom-container">
-  <!-- All Albums (List) -->
-  <div class="box albums-box">
-    <h2>All Albums</h2>
-    <input id="search" type="text" placeholder="Search albums or artists…" />
-    <div id="album-list"></div>
-  </div>
-
-  <!-- Album Grid -->
-  <div class="box album-grid-box">
-    <h2>Album Grid</h2>
-    <div class="album-grid-container">
-      <div id="album-grid" class="album-grid"></div>
+<!-- ==================== ALBUMS PAGE ==================== -->
+<div class="page" id="page-albums">
+  <div class="albums-page-layout">
+    <!-- Left sidebar -->
+    <div class="albums-sidebar">
+      <h2>Recent Albums</h2>
+      <div class="albums-sidebar-list" id="albums-sidebar-list"></div>
     </div>
-    <div class="pagination" id="grid-pagination">
-      <div class="pagination-info" id="grid-page-info"></div>
-      <div class="pagination-buttons">
-        <button id="grid-load-more">Load More</button>
+    <!-- Right detail panel -->
+    <div class="albums-detail-panel" id="albums-detail-panel">
+      <div class="albums-detail-empty">
+        <div class="empty-icon">?</div>
+        <div>Select an album to view its tracks</div>
       </div>
     </div>
-  </div>
-
-  <!-- Recent Albums -->
-  <div class="box recent-box">
-    <h2>Recent Albums</h2>
-    <div id="recent-albums"></div>
-    <div class="pagination" id="recent-pagination">
-      <div class="pagination-info" id="recent-page-info"></div>
-      <div class="pagination-buttons">
-        <button id="recent-load-more">Load More</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Recent Artists -->
-  <div class="box artists-box">
-    <h2>Recent Artists</h2>
-    <div id="recent-artists"></div>
-  </div>
-
-  <!-- Inbox -->
-  <div class="box inbox-box">
-    <h2>Inbox</h2>
-    <div id="inbox-summary">
-      <div>Tracks: <span id="inbox-tracks">–</span></div>
-      <div>Artists: <span id="inbox-artists">–</span></div>
-      <div>Albums: <span id="inbox-albums">–</span></div>
-      <div class="full-width">Total time: <span id="inbox-time">–</span></div>
-      <div class="full-width">Total size: <span id="inbox-size">–</span></div>
-    </div>
-    <div class="inbox-note">
-      Expandable folders<br />
-      Artist ? Albums ? Files
-    </div>
-    <div id="inbox-tree"></div>
-    <div id="inbox-files"></div>
   </div>
 </div>
 
 <!-- JAVASCRIPT -->
 <script>
-  // Utility functions
-  function showLoading() {
-    document.getElementById("loading").style.display = "block";
+// ==================== UTILITIES ====================
+
+function showLoading() { document.getElementById("loading").style.display = "block"; }
+function hideLoading() { document.getElementById("loading").style.display = "none"; }
+function setStatus(msg) { document.getElementById("status").textContent = "Status: " + msg; }
+function _safe(v) { return (v === undefined || v === null || v === "") ? "-" : String(v); }
+
+function fmtTimestamp(epoch) {
+  if (!epoch || epoch === 0) return "-";
+  const d = new Date(epoch * 1000);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+}
+
+function formatCompactTime(timeStr) {
+  if (!timeStr || timeStr === "0 seconds" || timeStr === "-") return "0 hrs";
+  const weekMatch = timeStr.match(/(\d+)\s*week/);
+  const dayMatch = timeStr.match(/(\d+)\s*day/);
+  const hourMatch = timeStr.match(/(\d+)\s*hour/);
+  const minMatch = timeStr.match(/(\d+)\s*minute/);
+  const secMatch = timeStr.match(/(\d+)\s*second/);
+  const weeks = weekMatch ? parseInt(weekMatch[1]) : 0;
+  const days = dayMatch ? parseInt(dayMatch[1]) : 0;
+  const hours = hourMatch ? parseInt(hourMatch[1]) : 0;
+  const minutes = minMatch ? parseInt(minMatch[1]) : 0;
+  const seconds = secMatch ? parseInt(secMatch[1]) : 0;
+  const totalHours = (weeks*7*24) + (days*24) + hours + (minutes/60) + (seconds/3600);
+  if (totalHours >= 24) return (totalHours/24).toFixed(1) + " days";
+  if (totalHours >= 1) return totalHours.toFixed(1) + " hrs";
+  if (minutes >= 1) return minutes + " min";
+  return seconds + " sec";
+}
+
+function formatTrackDuration(seconds) {
+  if (!seconds && seconds !== 0) return "-";
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function coverUrlFor(album) {
+  if (album && album.folder) return "/music/library" + album.folder + "/cover.jpg";
+  return "/static/placeholder.jpg";
+}
+
+// ==================== NAVIGATION ====================
+
+const tabs = document.querySelectorAll(".nav-tab");
+const pages = { main: document.getElementById("page-main"), albums: document.getElementById("page-albums") };
+
+tabs.forEach(tab => {
+  tab.addEventListener("click", () => {
+    tabs.forEach(t => t.classList.remove("active"));
+    Object.values(pages).forEach(p => p.classList.remove("active"));
+    tab.classList.add("active");
+    pages[tab.dataset.page].classList.add("active");
+  });
+});
+
+// ==================== GLOBAL STATE ====================
+
+let allAlbums = [];
+let filteredAlbums = [];
+const PAGE_SIZE = 20;
+let gridItemsToShow = PAGE_SIZE;
+let currentSelectedAlbum = null;
+
+// ==================== STATS ====================
+
+async function loadStats() {
+  showLoading();
+  try {
+    const res = await fetch("/api/stats");
+    if (!res.ok) throw new Error("status " + res.status);
+    const data = await res.json();
+    const statsDiv = document.getElementById("stats");
+    statsDiv.innerHTML = "";
+    const add = (label, value) => { const d = document.createElement("div"); d.textContent = label + ": " + value; statsDiv.appendChild(d); };
+    add("Tracks", data.tracks ?? "-");
+    add("Albums", data.albums ?? "-");
+    add("Artists", data.album_artists ?? "-");
+    add("Total time", data.total_time ?? "-");
+    add("Total size", data.total_size ?? "-");
+  } catch (e) { console.error("loadStats error", e); }
+  finally { hideLoading(); }
+}
+
+// ==================== INBOX ====================
+
+async function loadInboxStats() {
+  try {
+    const res = await fetch("/api/inbox/stats");
+    if (!res.ok) throw new Error("status " + res.status);
+    const data = await res.json();
+    document.getElementById("inbox-tracks").textContent = _safe(data?.tracks);
+    document.getElementById("inbox-time").textContent = formatCompactTime(data?.total_time);
+    document.getElementById("inbox-size").textContent = _safe(data?.total_size);
+    document.getElementById("inbox-artists").textContent = _safe(data?.artists);
+    document.getElementById("inbox-albums").textContent = _safe(data?.albums);
+  } catch (err) { console.error("loadInboxStats:", err); }
+}
+
+function renderInboxTree(tree) {
+  const container = document.getElementById("inbox-tree");
+  container.innerHTML = "";
+  if (!tree || Object.keys(tree).length === 0) {
+    const p = document.createElement("div"); p.style.color = "#666"; p.textContent = "No inbox folders found.";
+    container.appendChild(p); return;
   }
-  function hideLoading() {
-    document.getElementById("loading").style.display = "none";
-  }
-  function setStatus(msg) {
-    document.getElementById("status").textContent = "Status: " + msg;
-  }
-  function _safe(v) {
-    return v === undefined || v === null || v === "" ? "-" : String(v);
-  }
-  function fmtTimestamp(epoch) {
-    if (!epoch || epoch === 0) return "-";
-    const d = new Date(epoch * 1000);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    const hh = String(d.getHours()).padStart(2, "0");
-    const mm = String(d.getMinutes()).padStart(2, "0");
-    return `${y}-${m}-${day} ${hh}:${mm}`;
-  }
-
-  // Format time in compact decimal format (e.g., "4.5 hours" instead of "4 hours and 30 minutes")
-  function formatCompactTime(timeStr) {
-    if (!timeStr || timeStr === "0 seconds" || timeStr === "-") return "0 hrs";
-    
-    // Parse the humanized time string
-    const weekMatch = timeStr.match(/(\d+)\s*week/);
-    const dayMatch = timeStr.match(/(\d+)\s*day/);
-    const hourMatch = timeStr.match(/(\d+)\s*hour/);
-    const minMatch = timeStr.match(/(\d+)\s*minute/);
-    const secMatch = timeStr.match(/(\d+)\s*second/);
-    
-    const weeks = weekMatch ? parseInt(weekMatch[1]) : 0;
-    const days = dayMatch ? parseInt(dayMatch[1]) : 0;
-    const hours = hourMatch ? parseInt(hourMatch[1]) : 0;
-    const minutes = minMatch ? parseInt(minMatch[1]) : 0;
-    const seconds = secMatch ? parseInt(secMatch[1]) : 0;
-    
-    // Convert everything to hours
-    const totalHours = (weeks * 7 * 24) + (days * 24) + hours + (minutes / 60) + (seconds / 3600);
-    
-    if (totalHours >= 24) {
-      const totalDays = totalHours / 24;
-      return totalDays.toFixed(1) + " days";
-    } else if (totalHours >= 1) {
-      return totalHours.toFixed(1) + " hrs";
-    } else if (minutes >= 1) {
-      return minutes + " min";
-    } else {
-      return seconds + " sec";
-    }
-  }
-
-  // Global album arrays
-  let allAlbums = [];
-  let filteredAlbums = [];
-  
-  // Load more state - tracks how many items to display
-  const PAGE_SIZE = 20;
-  let gridItemsToShow = PAGE_SIZE;
-  let recentItemsToShow = PAGE_SIZE;
-
-  // Load library stats
-  async function loadStats() {
-    showLoading();
-    try {
-      const res = await fetch("/api/stats");
-      if (!res.ok) throw new Error("status " + res.status);
-      const data = await res.json();
-      const statsDiv = document.getElementById("stats");
-      statsDiv.innerHTML = "";
-      const add = (label, value) => {
-        const div = document.createElement("div");
-        div.textContent = label + ": " + value;
-        statsDiv.appendChild(div);
-      };
-      add("Tracks", data.tracks ?? "-");
-      add("Albums", data.albums ?? "-");
-      add("Artists", data.album_artists ?? "-");
-      add("Total time", data.total_time ?? "-");
-      add("Total size", data.total_size ?? "-");
-    } catch (e) {
-      console.error("loadStats error", e);
-    } finally {
-      hideLoading();
-    }
-  }
-
-  // Inbox stats
-  async function loadInboxStats() {
-    try {
-      const res = await fetch("/api/inbox/stats");
-      if (!res.ok) throw new Error("status " + res.status);
-      const data = await res.json();
-      document.getElementById("inbox-tracks").textContent = _safe(data?.tracks);
-      document.getElementById("inbox-time").textContent = formatCompactTime(data?.total_time);
-      document.getElementById("inbox-size").textContent = _safe(data?.total_size);
-      document.getElementById("inbox-artists").textContent = _safe(data?.artists);
-      document.getElementById("inbox-albums").textContent = _safe(data?.albums);
-    } catch (err) {
-      console.error("loadInboxStats:", err);
-    }
-  }
-
-  // Inbox tree rendering
-  function renderInboxTree(tree) {
-    const container = document.getElementById("inbox-tree");
-    container.innerHTML = "";
-    if (!tree || Object.keys(tree).length === 0) {
-      const p = document.createElement("div");
-      p.style.color = "#666";
-      p.textContent = "No inbox folders found.";
-      container.appendChild(p);
-      return;
-    }
-    for (const artist of Object.keys(tree).sort((a, b) => a.localeCompare(b))) {
-      const artistDiv = document.createElement("div");
-      artistDiv.className = "inbox-artist";
-      artistDiv.textContent = artist;
-
-      const albumList = document.createElement("div");
-      albumList.className = "inbox-albums";
-
-      (tree[artist] || []).forEach((album) => {
-        const albumDiv = document.createElement("div");
-        albumDiv.className = "inbox-album";
-        albumDiv.textContent = "? " + album;
-        albumDiv.title = album;
-        albumDiv.onclick = () => loadInboxFolder(artist, album);
-        albumList.appendChild(albumDiv);
-      });
-
-      container.appendChild(artistDiv);
-      container.appendChild(albumList);
-    }
-  }
-
-  async function loadInboxTree() {
-    try {
-      const res = await fetch("/api/inbox/tree");
-      if (!res.ok) throw new Error("status " + res.status);
-      const data = await res.json();
-      renderInboxTree(data.folders || data);
-    } catch (err) {
-      console.error("loadInboxTree:", err);
-      renderInboxTree({});
-    }
-  }
-
-  async function loadInboxFolder(artist, album) {
-    try {
-      const url = `/api/inbox/folder?artist=${encodeURIComponent(artist)}&album=${encodeURIComponent(album)}`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("status " + res.status);
-      const data = await res.json();
-      renderInboxFiles(artist, album, data.files);
-    } catch (err) {
-      console.error("loadInboxFolder:", err);
-      renderInboxFiles(artist, album, []);
-    }
-  }
-
-  function renderInboxFiles(artist, album, files) {
-    const container = document.getElementById("inbox-files");
-    container.innerHTML = "";
-    const title = document.createElement("h3");
-    title.textContent = `${artist} — ${album}`;
-    container.appendChild(title);
-
-    if (!files || files.length === 0) {
-      const p = document.createElement("div");
-      p.style.color = "#666";
-      p.textContent = "No files found in this folder.";
-      container.appendChild(p);
-      return;
-    }
-
-    const list = document.createElement("ul");
-    files.forEach((f) => {
-      const li = document.createElement("li");
-      li.textContent = f;
-      list.appendChild(li);
+  for (const artist of Object.keys(tree).sort((a,b) => a.localeCompare(b))) {
+    const artistDiv = document.createElement("div"); artistDiv.className = "inbox-artist"; artistDiv.textContent = artist;
+    const albumList = document.createElement("div"); albumList.className = "inbox-albums";
+    (tree[artist] || []).forEach((album) => {
+      const albumDiv = document.createElement("div"); albumDiv.className = "inbox-album";
+      albumDiv.textContent = "› " + album; albumDiv.title = album;
+      albumDiv.onclick = () => loadInboxFolder(artist, album);
+      albumList.appendChild(albumDiv);
     });
-    container.appendChild(list);
+    container.appendChild(artistDiv); container.appendChild(albumList);
   }
+}
 
-  // Load all albums
-  async function loadAlbums() {
-    showLoading();
-    try {
-      const res = await fetch("/data/albums.json");
-      if (!res.ok) throw new Error("status " + res.status);
-      const data = await res.json();
-      allAlbums = Array.isArray(data) ? data.sort((a, b) => (b._mtime || 0) - (a._mtime || 0)) : [];
-      filteredAlbums = allAlbums.slice();
-      
-      // Reset to initial load amount
-      gridItemsToShow = PAGE_SIZE;
-      recentItemsToShow = PAGE_SIZE;
-      
-      renderAlbums();
-      renderAlbumGrid();
-      renderRecentAlbums();
-      renderRecentArtists(allAlbums);
-    } catch (e) {
-      console.error("loadAlbums error", e);
-    } finally {
-      hideLoading();
-    }
+async function loadInboxTree() {
+  try {
+    const res = await fetch("/api/inbox/tree");
+    if (!res.ok) throw new Error("status " + res.status);
+    const data = await res.json();
+    renderInboxTree(data.folders || data);
+  } catch (err) { console.error("loadInboxTree:", err); renderInboxTree({}); }
+}
+
+async function loadInboxFolder(artist, album) {
+  try {
+    const url = `/api/inbox/folder?artist=${encodeURIComponent(artist)}&album=${encodeURIComponent(album)}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("status " + res.status);
+    const data = await res.json();
+    renderInboxFiles(artist, album, data.files);
+  } catch (err) { console.error("loadInboxFolder:", err); renderInboxFiles(artist, album, []); }
+}
+
+function renderInboxFiles(artist, album, files) {
+  const container = document.getElementById("inbox-files");
+  container.innerHTML = "";
+  const title = document.createElement("h3"); title.textContent = `${artist} — ${album}`; container.appendChild(title);
+  if (!files || files.length === 0) {
+    const p = document.createElement("div"); p.style.color = "#666"; p.textContent = "No files found."; container.appendChild(p); return;
   }
+  const list = document.createElement("ul");
+  files.forEach(f => { const li = document.createElement("li"); li.textContent = f; list.appendChild(li); });
+  container.appendChild(list);
+}
 
-  // Album list rendering
-  function renderAlbums() {
-    const list = document.getElementById("album-list");
-    if (!list) return;
-    list.innerHTML = "";
-    for (const a of filteredAlbums) {
-      const row = document.createElement("div");
-      row.className = "album-row";
+// ==================== ALBUMS (MAIN PAGE) ====================
 
-      const title = document.createElement("div");
-      title.className = "album-title";
-      title.textContent = a.album || "(Unknown album)";
-
-      const meta = document.createElement("div");
-      meta.className = "album-meta";
-      const bits = [];
-      if (a.albumartist) bits.push(a.albumartist);
-      else if (a.artist) bits.push(a.artist);
-      if (a.year) bits.push(a.year);
-      meta.textContent = bits.join(" • ") || "-";
-
-      row.appendChild(title);
-      row.appendChild(meta);
-      list.appendChild(row);
-    }
-  }
-
-  // Album grid rendering with load more
-  function renderAlbumGrid() {
-    const grid = document.getElementById("album-grid");
-    if (!grid) return;
-    grid.innerHTML = "";
-    
-    const albums = filteredAlbums;
-    const itemsToDisplay = Math.min(gridItemsToShow, albums.length);
-    const pageAlbums = albums.slice(0, itemsToDisplay);
-    
-    pageAlbums.forEach((a) => {
-      const item = document.createElement("div");
-      item.className = "album-grid-item";
-
-      const coverDiv = document.createElement("div");
-      coverDiv.className = "album-grid-cover";
-
-      const img = document.createElement("img");
-      img.src = coverUrlFor(a);
-      img.onerror = () => {
-        img.onerror = null;
-        img.src = "/static/placeholder.jpg";
-      };
-      coverDiv.appendChild(img);
-
-      const title = document.createElement("div");
-      title.className = "album-grid-title";
-      title.textContent = a.album || "(Unknown album)";
-
-      const meta = document.createElement("div");
-      meta.className = "album-grid-meta";
-      const bits = [];
-      if (a.albumartist) bits.push(a.albumartist);
-      else if (a.artist) bits.push(a.artist);
-      if (a.year) bits.push(a.year);
-      meta.textContent = bits.join(" • ") || "-";
-
-      item.appendChild(coverDiv);
-      item.appendChild(title);
-      item.appendChild(meta);
-      grid.appendChild(item);
-    });
-    
-    // Update load more info
-    const pageInfo = document.getElementById("grid-page-info");
-    if (pageInfo) {
-      pageInfo.textContent = `Showing ${itemsToDisplay} of ${albums.length}`;
-    }
-    
-    // Update button state
-    const loadMoreBtn = document.getElementById("grid-load-more");
-    if (loadMoreBtn) {
-      loadMoreBtn.disabled = itemsToDisplay >= albums.length;
-      loadMoreBtn.textContent = itemsToDisplay >= albums.length ? "All Loaded" : "Load More";
-    }
-  }
-
-  // Search filter
-  function filterAlbums() {
-    const q = (document.getElementById("search")?.value || "").toLowerCase().trim();
-    if (!q) {
-      filteredAlbums = allAlbums.slice();
-    } else {
-      filteredAlbums = allAlbums.filter((a) => {
-        const hay = ((a.album || "") + " " + (a.albumartist || a.artist || "")).toLowerCase();
-        return hay.includes(q);
-      });
-    }
-    gridItemsToShow = PAGE_SIZE; // Reset to initial amount when searching
+async function loadAlbums() {
+  showLoading();
+  try {
+    const res = await fetch("/data/albums.json");
+    if (!res.ok) throw new Error("status " + res.status);
+    const data = await res.json();
+    allAlbums = Array.isArray(data) ? data.sort((a,b) => (b._mtime || 0) - (a._mtime || 0)) : [];
+    filteredAlbums = allAlbums.slice();
+    gridItemsToShow = PAGE_SIZE;
     renderAlbums();
     renderAlbumGrid();
+    renderRecentArtists(allAlbums);
+    renderAlbumsSidebar();
+  } catch (e) { console.error("loadAlbums error", e); }
+  finally { hideLoading(); }
+}
+
+function renderAlbums() {
+  const list = document.getElementById("album-list");
+  if (!list) return;
+  list.innerHTML = "";
+  for (const a of filteredAlbums) {
+    const row = document.createElement("div"); row.className = "album-row";
+    const title = document.createElement("div"); title.className = "album-title"; title.textContent = a.album || "(Unknown album)";
+    const meta = document.createElement("div"); meta.className = "album-meta";
+    const bits = [];
+    if (a.albumartist) bits.push(a.albumartist); else if (a.artist) bits.push(a.artist);
+    if (a.year) bits.push(a.year);
+    meta.textContent = bits.join(" • ") || "-";
+    row.appendChild(title); row.appendChild(meta); list.appendChild(row);
   }
+}
 
-  // Render recent albums with load more
-  function renderRecentAlbums() {
-    const container = document.getElementById("recent-albums");
-    if (!container) return;
-    container.innerHTML = "";
-    
-    const albums = allAlbums;
-    const itemsToDisplay = Math.min(recentItemsToShow, albums.length);
-    const pageAlbums = albums.slice(0, itemsToDisplay);
-    
-    pageAlbums.forEach((a) => {
-      const item = document.createElement("div");
-      item.className = "recent-item";
-
-      const coverDiv = document.createElement("div");
-      coverDiv.className = "recent-cover";
-
-      const img = document.createElement("img");
-      img.src = coverUrlFor(a);
-      img.onerror = () => {
-        img.onerror = null;
-        img.src = "/static/placeholder.jpg";
-      };
-      coverDiv.appendChild(img);
-
-      const title = document.createElement("div");
-      title.className = "recent-title";
-      title.textContent = a.album || "(Unknown album)";
-
-      const metaRow = document.createElement("div");
-      metaRow.className = "recent-meta";
-
-      const artistDiv = document.createElement("div");
-      artistDiv.className = "recent-artist";
-      artistDiv.textContent = a.albumartist || a.artist || "";
-
-      const ts = document.createElement("div");
-      ts.className = "recent-ts";
-      ts.textContent = fmtTimestamp(a._mtime);
-
-      metaRow.appendChild(artistDiv);
-      metaRow.appendChild(ts);
-
-      item.appendChild(coverDiv);
-      item.appendChild(title);
-      item.appendChild(metaRow);
-      container.appendChild(item);
-    });
-    
-    // Update load more info
-    const pageInfo = document.getElementById("recent-page-info");
-    if (pageInfo) {
-      pageInfo.textContent = `Showing ${itemsToDisplay} of ${albums.length}`;
-    }
-    
-    // Update button state
-    const loadMoreBtn = document.getElementById("recent-load-more");
-    if (loadMoreBtn) {
-      loadMoreBtn.disabled = itemsToDisplay >= albums.length;
-      loadMoreBtn.textContent = itemsToDisplay >= albums.length ? "All Loaded" : "Load More";
-    }
-  }
-
-  // Render recent artists
-  function renderRecentArtists(albums) {
-    const recentArtists = [];
-    const seen = new Set();
-    for (const a of albums) {
-      const name = a.albumartist || a.artist || "(Unknown artist)";
-      if (!seen.has(name)) {
-        seen.add(name);
-        recentArtists.push(a);
-        if (recentArtists.length >= 40) break;
-      }
-    }
-    const container = document.getElementById("recent-artists");
-    if (!container) return;
-    container.innerHTML = "";
-    recentArtists.forEach((a) => {
-      const row = document.createElement("div");
-      row.className = "artist-row";
-
-      const img = document.createElement("img");
-      img.src = coverUrlFor(a);
-      img.onerror = () => {
-        img.onerror = null;
-        img.src = "/static/placeholder.jpg";
-      };
-
-      const textWrap = document.createElement("div");
-      const nameDiv = document.createElement("div");
-      nameDiv.className = "artist-name";
-      nameDiv.textContent = a.albumartist || a.artist || "";
-
-      const metaDiv = document.createElement("div");
-      metaDiv.className = "artist-meta";
-      metaDiv.textContent = "• " + (a.albumartist || a.artist || "");
-
-      textWrap.appendChild(nameDiv);
-      textWrap.appendChild(metaDiv);
-
-      row.appendChild(img);
-      row.appendChild(textWrap);
-      container.appendChild(row);
-    });
-  }
-
-  // Helper for cover URL
-  function coverUrlFor(album) {
-    if (album && album.folder) {
-      return "/music/library" + album.folder + "/cover.jpg";
-    }
-    return "/static/placeholder.jpg";
-  }
-
-  // Button actions
-  async function importInbox() {
-    setStatus("Importing inbox...");
-    try {
-      const res = await fetch("/api/library/import", { method: "POST" });
-      const data = await res.json();
-      setStatus("Import started: " + (data.detail || data.status || ""));
-    } catch (e) {
-      console.error(e);
-      setStatus("Import failed");
-    }
-  }
-
-  async function reimportLibrary() {
-    setStatus("Full Re-import...");
-    try {
-      const res = await fetch("/api/library/refresh", { method: "POST" });
-      await res.json();
-      setStatus("Re-import/refresh done");
-      await loadAlbums();
-    } catch (e) {
-      console.error(e);
-      setStatus("Re-import failed");
-    }
-  }
-
-  async function refreshLibrary() {
-    setStatus("Refreshing...");
-    try {
-      const res = await fetch("/api/library/refresh", { method: "POST" });
-      await res.json();
-      setStatus("Refresh done");
-      await loadAlbums();
-    } catch (e) {
-      console.error(e);
-      setStatus("Refresh failed");
-    }
-  }
-
-  async function extractCovers() {
-    setStatus("Extracting covers...");
-    try {
-      const res = await fetch("/api/library/refresh", { method: "POST" });
-      await res.json();
-      setStatus("Covers extracted");
-      await loadAlbums();
-    } catch (e) {
-      console.error(e);
-      setStatus("Extract failed");
-    }
-  }
-
-  // Load more handlers
-  function gridLoadMore() {
-    gridItemsToShow += PAGE_SIZE;
-    renderAlbumGrid();
-  }
-
-  function recentLoadMore() {
-    recentItemsToShow += PAGE_SIZE;
-    renderRecentAlbums();
-  }
-
-  // Initialize on DOM load
-  document.addEventListener("DOMContentLoaded", () => {
-    loadStats();
-    loadInboxStats();
-    loadInboxTree();
-    loadAlbums();
-
-    // Bind buttons
-    document.getElementById("importBtn").onclick = importInbox;
-    document.getElementById("reimportBtn").onclick = reimportLibrary;
-    document.getElementById("refreshBtn").onclick = refreshLibrary;
-    document.getElementById("extractBtn").onclick = extractCovers;
-
-    // Bind load more buttons
-    document.getElementById("grid-load-more").onclick = gridLoadMore;
-    document.getElementById("recent-load-more").onclick = recentLoadMore;
-
-    // Search binding
-    const searchInput = document.getElementById("search");
-    if (searchInput) {
-      searchInput.addEventListener("input", filterAlbums);
-    }
-
-    // Periodic refresh of stats/inbox
-    setInterval(() => {
-      loadStats();
-      loadInboxStats();
-      loadInboxTree();
-    }, 60000);
+function renderAlbumGrid() {
+  const grid = document.getElementById("album-grid");
+  if (!grid) return;
+  grid.innerHTML = "";
+  const albums = filteredAlbums;
+  const itemsToDisplay = Math.min(gridItemsToShow, albums.length);
+  albums.slice(0, itemsToDisplay).forEach((a) => {
+    const item = document.createElement("div"); item.className = "album-grid-item";
+    const coverDiv = document.createElement("div"); coverDiv.className = "album-grid-cover";
+    const img = document.createElement("img"); img.src = coverUrlFor(a);
+    img.onerror = () => { img.onerror = null; img.src = "/static/placeholder.jpg"; };
+    coverDiv.appendChild(img);
+    const title = document.createElement("div"); title.className = "album-grid-title"; title.textContent = a.album || "(Unknown album)";
+    const meta = document.createElement("div"); meta.className = "album-grid-meta";
+    const bits = [];
+    if (a.albumartist) bits.push(a.albumartist); else if (a.artist) bits.push(a.artist);
+    if (a.year) bits.push(a.year);
+    meta.textContent = bits.join(" • ") || "-";
+    item.appendChild(coverDiv); item.appendChild(title); item.appendChild(meta); grid.appendChild(item);
   });
+  const pageInfo = document.getElementById("grid-page-info");
+  if (pageInfo) pageInfo.textContent = `Showing ${itemsToDisplay} of ${albums.length}`;
+  const btn = document.getElementById("grid-load-more");
+  if (btn) { btn.disabled = itemsToDisplay >= albums.length; btn.textContent = btn.disabled ? "All Loaded" : "Load More"; }
+}
+
+function filterAlbums() {
+  const q = (document.getElementById("search")?.value || "").toLowerCase().trim();
+  filteredAlbums = q ? allAlbums.filter(a => ((a.album||"") + " " + (a.albumartist||a.artist||"")).toLowerCase().includes(q)) : allAlbums.slice();
+  gridItemsToShow = PAGE_SIZE;
+  renderAlbums();
+  renderAlbumGrid();
+}
+
+function renderRecentArtists(albums) {
+  const recentArtists = []; const seen = new Set();
+  for (const a of albums) {
+    const name = a.albumartist || a.artist || "(Unknown artist)";
+    if (!seen.has(name)) { seen.add(name); recentArtists.push(a); if (recentArtists.length >= 40) break; }
+  }
+  const container = document.getElementById("recent-artists");
+  if (!container) return;
+  container.innerHTML = "";
+  recentArtists.forEach((a) => {
+    const row = document.createElement("div"); row.className = "artist-row";
+    const img = document.createElement("img"); img.src = coverUrlFor(a);
+    img.onerror = () => { img.onerror = null; img.src = "/static/placeholder.jpg"; };
+    const textWrap = document.createElement("div");
+    const nameDiv = document.createElement("div"); nameDiv.className = "artist-name"; nameDiv.textContent = a.albumartist || a.artist || "";
+    const metaDiv = document.createElement("div"); metaDiv.className = "artist-meta"; metaDiv.textContent = (a.year || "");
+    textWrap.appendChild(nameDiv); textWrap.appendChild(metaDiv);
+    row.appendChild(img); row.appendChild(textWrap); container.appendChild(row);
+  });
+}
+
+// ==================== ALBUMS PAGE ====================
+
+function renderAlbumsSidebar() {
+  const container = document.getElementById("albums-sidebar-list");
+  if (!container) return;
+  container.innerHTML = "";
+  // Show all albums sorted by mtime (most recent first)
+  allAlbums.forEach((a, idx) => {
+    const item = document.createElement("div");
+    item.className = "sidebar-album-item";
+    item.dataset.idx = idx;
+    item.onclick = () => selectAlbum(idx);
+
+    const thumb = document.createElement("div"); thumb.className = "sidebar-album-thumb";
+    const img = document.createElement("img"); img.src = coverUrlFor(a);
+    img.onerror = () => { img.onerror = null; img.src = "/static/placeholder.jpg"; };
+    thumb.appendChild(img);
+
+    const info = document.createElement("div"); info.className = "sidebar-album-info";
+    const name = document.createElement("div"); name.className = "sidebar-album-name"; name.textContent = a.album || "(Unknown)";
+    const artist = document.createElement("div"); artist.className = "sidebar-album-artist"; artist.textContent = a.albumartist || a.artist || "";
+    info.appendChild(name); info.appendChild(artist);
+
+    const year = document.createElement("div"); year.className = "sidebar-album-year"; year.textContent = a.year || "";
+
+    item.appendChild(thumb); item.appendChild(info); item.appendChild(year);
+    container.appendChild(item);
+  });
+}
+
+function selectAlbum(idx) {
+  currentSelectedAlbum = idx;
+  // Highlight in sidebar
+  document.querySelectorAll(".sidebar-album-item").forEach(el => el.classList.remove("active"));
+  const selected = document.querySelector(`.sidebar-album-item[data-idx="${idx}"]`);
+  if (selected) selected.classList.add("active");
+  // Render detail
+  renderAlbumDetail(allAlbums[idx]);
+}
+
+function renderAlbumDetail(album) {
+  const panel = document.getElementById("albums-detail-panel");
+  if (!album) {
+    panel.innerHTML = '<div class="albums-detail-empty"><div class="empty-icon">?</div><div>Select an album to view its tracks</div></div>';
+    return;
+  }
+
+  // Build tracklist from album.tracks if available, otherwise show a message
+  const tracks = album.tracks || [];
+
+  let totalSeconds = 0;
+  tracks.forEach(t => { totalSeconds += (t.length || 0); });
+
+  panel.innerHTML = "";
+
+  // Header
+  const header = document.createElement("div"); header.className = "albums-detail-header";
+  const coverWrap = document.createElement("div"); coverWrap.className = "albums-detail-cover";
+  const coverImg = document.createElement("img"); coverImg.src = coverUrlFor(album);
+  coverImg.onerror = () => { coverImg.onerror = null; coverImg.src = "/static/placeholder.jpg"; };
+  coverWrap.appendChild(coverImg);
+
+  const info = document.createElement("div"); info.className = "albums-detail-info";
+  const titleEl = document.createElement("div"); titleEl.className = "albums-detail-title"; titleEl.textContent = album.album || "(Unknown album)";
+  const artistEl = document.createElement("div"); artistEl.className = "albums-detail-artist"; artistEl.textContent = album.albumartist || album.artist || "";
+  const metaParts = [];
+  if (album.year) metaParts.push(album.year);
+  if (tracks.length) metaParts.push(tracks.length + " tracks");
+  if (totalSeconds > 0) metaParts.push(formatCompactTime(totalSeconds + " seconds"));
+  const metaEl = document.createElement("div"); metaEl.className = "albums-detail-meta"; metaEl.textContent = metaParts.join(" • ");
+  info.appendChild(titleEl); info.appendChild(artistEl); info.appendChild(metaEl);
+  header.appendChild(coverWrap); header.appendChild(info);
+  panel.appendChild(header);
+
+  // Tracklist
+  const trackContainer = document.createElement("div"); trackContainer.className = "tracklist-container";
+
+  if (tracks.length === 0) {
+    const empty = document.createElement("div");
+    empty.style.cssText = "padding: 32px 16px; color: #666; font-size: 13px; text-align: center;";
+    empty.textContent = "No track data available for this album.";
+    trackContainer.appendChild(empty);
+  } else {
+    const table = document.createElement("table"); table.className = "tracklist-table";
+    const thead = document.createElement("thead");
+    const headerRow = document.createElement("tr");
+    ["#", "Title", "Artist", "Duration"].forEach(h => {
+      const th = document.createElement("th"); th.textContent = h; headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow); table.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+    tracks.forEach((t, i) => {
+      const tr = document.createElement("tr");
+      const numTd = document.createElement("td"); numTd.className = "track-num"; numTd.textContent = (t.track || (i+1));
+      const titleTd = document.createElement("td"); titleTd.className = "track-title"; titleTd.textContent = t.title || "(Untitled)";
+      const artistTd = document.createElement("td"); artistTd.textContent = t.artist || album.albumartist || album.artist || "";
+      const durTd = document.createElement("td"); durTd.className = "track-duration"; durTd.textContent = formatTrackDuration(t.length);
+      tr.appendChild(numTd); tr.appendChild(titleTd); tr.appendChild(artistTd); tr.appendChild(durTd);
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    trackContainer.appendChild(table);
+  }
+  panel.appendChild(trackContainer);
+}
+
+// ==================== BUTTON ACTIONS ====================
+
+async function importInbox() {
+  setStatus("Importing inbox...");
+  try {
+    const res = await fetch("/api/library/import", { method: "POST" });
+    const data = await res.json();
+    setStatus("Import started: " + (data.detail || data.status || ""));
+  } catch (e) { console.error(e); setStatus("Import failed"); }
+}
+
+async function reimportLibrary() {
+  setStatus("Full Re-import...");
+  try {
+    await fetch("/api/library/refresh", { method: "POST" });
+    setStatus("Re-import/refresh done");
+    await loadAlbums();
+  } catch (e) { console.error(e); setStatus("Re-import failed"); }
+}
+
+async function refreshLibrary() {
+  setStatus("Refreshing...");
+  try {
+    await fetch("/api/library/refresh", { method: "POST" });
+    setStatus("Refresh done");
+    await loadAlbums();
+  } catch (e) { console.error(e); setStatus("Refresh failed"); }
+}
+
+async function extractCovers() {
+  setStatus("Extracting covers...");
+  try {
+    await fetch("/api/library/refresh", { method: "POST" });
+    setStatus("Covers extracted");
+    await loadAlbums();
+  } catch (e) { console.error(e); setStatus("Extract failed"); }
+}
+
+// ==================== INIT ====================
+
+document.addEventListener("DOMContentLoaded", () => {
+  loadStats();
+  loadInboxStats();
+  loadInboxTree();
+  loadAlbums();
+
+  document.getElementById("importBtn").onclick = importInbox;
+  document.getElementById("reimportBtn").onclick = reimportLibrary;
+  document.getElementById("refreshBtn").onclick = refreshLibrary;
+  document.getElementById("extractBtn").onclick = extractCovers;
+  document.getElementById("grid-load-more").onclick = () => { gridItemsToShow += PAGE_SIZE; renderAlbumGrid(); };
+  document.getElementById("search").addEventListener("input", filterAlbums);
+
+  setInterval(() => { loadStats(); loadInboxStats(); loadInboxTree(); }, 60000);
+});
 </script>
 </body>
 </html>

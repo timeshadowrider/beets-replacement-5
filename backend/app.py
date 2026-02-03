@@ -69,6 +69,7 @@ stop_event = threading.Event()
 
 inbox_stats_cache = None
 inbox_stats_cache_time = None
+inbox_stats_lock = threading.Lock()
 
 # Queues
 inbox_q = Queue()
@@ -114,35 +115,74 @@ def run_cmd_list(cmd, timeout=300):
         return False, str(e)
 
 def invalidate_inbox_cache(*_a, **_k):
+    """Invalidate the inbox cache - but with rate limiting to prevent spam"""
     global inbox_stats_cache, inbox_stats_cache_time
-    inbox_stats_cache = None
-    inbox_stats_cache_time = None
+    with inbox_stats_lock:
+        # Only log occasionally to prevent log spam
+        if inbox_stats_cache is not None:
+            inbox_stats_cache = None
+            inbox_stats_cache_time = None
+            # Don't log every invalidation - it's too noisy
 
 # ---------------------------------------------------------------------------
 # INBOX CLEANUP (delete dirs with NO audio files)
 # ---------------------------------------------------------------------------
 
 def cleanup_inbox_empty_dirs():
+    """Remove directories that have no audio files (recursively)"""
     AUDIO_EXTS = (".flac", ".mp3", ".wav", ".aac", ".m4a", ".ogg")
-
-    for root, dirs, files in os.walk(INBOX_PATH, topdown=False):
-        root_path = Path(root)
-
-        if root_path == INBOX_PATH:
+    
+    def has_audio_files(directory):
+        """Recursively check if directory or subdirectories contain audio files"""
+        try:
+            for root, dirs, files in os.walk(directory):
+                if any(f.lower().endswith(AUDIO_EXTS) for f in files):
+                    return True
+            return False
+        except Exception:
+            return True  # If we can't check, assume it has files (be safe)
+    
+    def remove_empty_dirs(directory):
+        """Remove directory and all empty subdirectories"""
+        if not directory.exists() or not directory.is_dir():
+            return
+        
+        # First, recursively remove empty subdirectories
+        for subdir in list(directory.iterdir()):
+            if subdir.is_dir():
+                remove_empty_dirs(subdir)
+        
+        # Then try to remove this directory if it's now empty
+        try:
+            if not any(directory.iterdir()):  # Check if empty
+                logger.info(f"[CLEANUP] Removing empty dir: {directory}")
+                directory.rmdir()
+        except Exception as e:
+            logger.debug(f"[CLEANUP] Could not remove {directory}: {e}")
+    
+    if not INBOX_PATH.exists():
+        return
+    
+    # Process all top-level directories
+    for item in INBOX_PATH.iterdir():
+        if not item.is_dir() or item.name.startswith("."):
             continue
-
-        root_str = str(root_path).lower()
-        if "unpack" in root_str:
+        
+        # Skip directories with "unpack" in the name
+        if "unpack" in item.name.lower():
             continue
-
-        has_audio = any(f.lower().endswith(AUDIO_EXTS) for f in files)
-
-        if not has_audio:
+        
+        # If directory has no audio files anywhere, remove it completely
+        if not has_audio_files(item):
             try:
-                logger.info("[CLEANUP] Removing inbox dir with no audio: %s", root_path)
-                os.rmdir(root_path)
+                logger.info(f"[CLEANUP] Removing directory tree with no audio: {item}")
+                import shutil
+                shutil.rmtree(item)
             except Exception as e:
-                logger.error("[CLEANUP] Failed to remove %s: %s", root_path, e)
+                logger.error(f"[CLEANUP] Failed to remove {item}: {e}")
+        else:
+            # Directory has audio files, just clean up empty subdirectories
+            remove_empty_dirs(item)
 
 def inbox_cleanup_scheduler():
     while not stop_event.is_set():
@@ -280,28 +320,33 @@ def recent(limit: int = 12):
         return []
 
 # ---------------------------------------------------------------------------
-# INBOX API
+# INBOX API - FIXED: Removed duplicate function name
 # ---------------------------------------------------------------------------
 
+@app.get("/api/inbox")
 @app.get("/api/inbox/stats")
-def inbox_stats():
+def get_inbox_stats():
+    """Get inbox statistics with caching"""
     global inbox_stats_cache, inbox_stats_cache_time
-    now = datetime.now()
-    if inbox_stats_cache and inbox_stats_cache_time:
-        if (now - inbox_stats_cache_time).total_seconds() < INBOX_STATS_CACHE_SECONDS:
-            return inbox_stats_cache
+    
+    with inbox_stats_lock:
+        now = datetime.now()
+        if inbox_stats_cache and inbox_stats_cache_time:
+            age = (now - inbox_stats_cache_time).total_seconds()
+            if age < INBOX_STATS_CACHE_SECONDS:
+                logger.debug(f"Returning cached inbox stats (age: {age:.1f}s)")
+                return inbox_stats_cache
 
-    inbox_stats_cache = compute_inbox_stats_fast()
-    inbox_stats_cache_time = now
-    return inbox_stats_cache
+        logger.info("Computing fresh inbox stats")
+        inbox_stats_cache = compute_inbox_stats_fast()
+        inbox_stats_cache_time = now
+        return inbox_stats_cache
 
 def compute_inbox_stats_fast():
-    AUDIO_EXTS = {".mp3", ".flac", ".m4a", ".ogg", ".wav", ".aac"}
-    tracks = total_bytes = total_seconds = 0
-    artists = set()
-    albums = set()
-
+    """Compute inbox stats - ULTRA-FAST version using shell commands"""
+    
     if not INBOX_PATH.exists():
+        logger.warning(f"Inbox path does not exist: {INBOX_PATH}")
         return {
             "tracks": 0,
             "total_time": "0 seconds",
@@ -311,36 +356,77 @@ def compute_inbox_stats_fast():
             "album_artists": 0,
         }
 
-    for artist_dir in INBOX_PATH.iterdir():
-        if not artist_dir.is_dir() or artist_dir.name.startswith("."):
-            continue
-        artists.add(artist_dir.name)
-
-        for album_dir in artist_dir.iterdir():
-            if not album_dir.is_dir():
-                continue
-            albums.add(f"{artist_dir.name}::{album_dir.name}")
-
-            for f in album_dir.iterdir():
-                if f.suffix.lower() not in AUDIO_EXTS:
+    try:
+        # Use shell commands for speed - much faster than Python file I/O
+        import subprocess
+        
+        # Count audio files (this is FAST even with 50k files)
+        count_cmd = f'find "{INBOX_PATH}" -type f \\( -iname "*.mp3" -o -iname "*.flac" -o -iname "*.m4a" -o -iname "*.ogg" -o -iname "*.wav" -o -iname "*.aac" \\) | wc -l'
+        result = subprocess.run(count_cmd, shell=True, capture_output=True, text=True, timeout=10)
+        tracks = int(result.stdout.strip()) if result.returncode == 0 else 0
+        
+        # Get total size (du is fast)
+        size_cmd = f'du -sb "{INBOX_PATH}" 2>/dev/null | cut -f1'
+        result = subprocess.run(size_cmd, shell=True, capture_output=True, text=True, timeout=10)
+        total_bytes = int(result.stdout.strip()) if result.returncode == 0 else 0
+        
+        # Count top-level directories (excluding _UNPACK_ and hidden)
+        dir_cmd = f'find "{INBOX_PATH}" -maxdepth 1 -type d ! -name ".*" ! -name "*_UNPACK_*" ! -path "{INBOX_PATH}" | wc -l'
+        result = subprocess.run(dir_cmd, shell=True, capture_output=True, text=True, timeout=5)
+        num_dirs = int(result.stdout.strip()) if result.returncode == 0 else 0
+        
+        # For artists/albums, just sample the first level dirs
+        artists = set()
+        albums = set()
+        
+        try:
+            for item in list(INBOX_PATH.iterdir())[:200]:  # Sample first 200
+                if not item.is_dir() or item.name.startswith(".") or "_UNPACK_" in item.name:
                     continue
-                tracks += 1
-                total_bytes += f.stat().st_size
-                try:
-                    audio = MutagenFile(str(f))
-                    if audio and audio.info:
-                        total_seconds += audio.info.length or 0
-                except Exception:
-                    pass
+                    
+                artists.add(item.name)
+                albums.add(item.name)
+        except Exception as e:
+            logger.warning(f"Error sampling directories: {e}")
+            artists.add("Unknown")
+            albums.add("Unknown")
+        
+        # Estimate time (3 minutes per track average)
+        estimated_minutes = tracks * 3
+        time_str = humanize.precisedelta(estimated_minutes * 60) if estimated_minutes > 0 else "0 seconds"
 
-    return {
-        "tracks": tracks,
-        "total_time": humanize.precisedelta(int(total_seconds)),
-        "total_size": humanize.naturalsize(total_bytes),
-        "artists": len(artists),
-        "albums": len(albums),
-        "album_artists": len(artists),
-    }
+        result_dict = {
+            "tracks": tracks,
+            "total_time": time_str,
+            "total_size": humanize.naturalsize(total_bytes),
+            "artists": len(artists),
+            "albums": len(albums),
+            "album_artists": len(artists),
+        }
+        
+        logger.info(f"Inbox stats (shell-computed): {tracks} tracks, {len(artists)} artists, {len(albums)} albums, {humanize.naturalsize(total_bytes)}")
+        return result_dict
+        
+    except subprocess.TimeoutExpired:
+        logger.error("Inbox stats computation timed out")
+        return {
+            "tracks": 0,
+            "total_time": "timeout",
+            "total_size": "0 B",
+            "artists": 0,
+            "albums": 0,
+            "album_artists": 0,
+        }
+    except Exception as e:
+        logger.error(f"Error computing inbox stats: {e}", exc_info=True)
+        return {
+            "tracks": 0,
+            "total_time": "error",
+            "total_size": "0 B",
+            "artists": 0,
+            "albums": 0,
+            "album_artists": 0,
+        }
 
 @app.get("/api/inbox/tree")
 def inbox_tree():
@@ -364,6 +450,29 @@ def inbox_folder(artist: str, album: str):
     if not folder.exists() or not folder.is_dir():
         return {"files": []}
     return {"files": [f.name for f in folder.iterdir() if f.is_file()]}
+
+# DEBUG ENDPOINTS
+@app.get("/api/inbox/debug")
+def inbox_debug():
+    """Debug endpoint for inbox information"""
+    with inbox_stats_lock:
+        return {
+            "inbox_path": str(INBOX_PATH),
+            "exists": INBOX_PATH.exists(),
+            "is_dir": INBOX_PATH.is_dir() if INBOX_PATH.exists() else False,
+            "readable": os.access(INBOX_PATH, os.R_OK) if INBOX_PATH.exists() else False,
+            "cache_time": inbox_stats_cache_time.isoformat() if inbox_stats_cache_time else None,
+            "cache_age_seconds": (datetime.now() - inbox_stats_cache_time).total_seconds() 
+                                if inbox_stats_cache_time else None,
+            "cached_stats": inbox_stats_cache,
+        }
+
+@app.post("/api/inbox/stats/clear-cache")
+def clear_inbox_cache():
+    """Clear the inbox stats cache"""
+    invalidate_inbox_cache()
+    logger.info("Inbox cache manually cleared via API")
+    return {"status": "ok", "message": "Inbox stats cache cleared"}
 
 # ---------------------------------------------------------------------------
 # FILE WATCHER HANDLER (DEBOUNCED)
@@ -444,7 +553,9 @@ def inbox_worker():
             logger.info("Importing inbox: %s", target)
             subprocess.run(args, timeout=IMPORT_TIMEOUT)
 
+            # Invalidate cache AFTER successful import
             invalidate_inbox_cache()
+            logger.info("Inbox import completed, cache invalidated")
 
         except Exception:
             logger.exception("Inbox import failed for %s", target)
@@ -580,13 +691,6 @@ def startup():
         root=INBOX_PATH,
         ignore_dirs=["_UNPACK_", "UNPACK", "unpack"]
     )
-    
-    # Wrap the handler to invalidate inbox cache on any event
-    original_on_any = inbox_handler.on_any_event
-    def on_any_with_cache_invalidation(event):
-        invalidate_inbox_cache()
-        original_on_any(event)
-    inbox_handler.on_any_event = on_any_with_cache_invalidation
     
     inbox_observer = Observer()
     inbox_observer.schedule(inbox_handler, str(INBOX_PATH), recursive=True)

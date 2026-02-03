@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Beets Album Status</title>
 
+<!-- Plyr.js Audio Player -->
+<link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+<script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
+
 <style>
 /* ==================== Neon Dark Theme ==================== */
 
@@ -14,6 +18,7 @@ body {
   padding: 0;
   background-color: #121212;
   color: #eee;
+  overflow-x: hidden; /* prevents horizontal scroll blowout */
 }
 
 /* ==================== NAV TABS ==================== */
@@ -55,7 +60,7 @@ body {
 
 .page {
   display: none;
-  padding: 16px;
+  padding: 12px 16px;
 }
 .page.active {
   display: block;
@@ -104,14 +109,15 @@ button:disabled {
 /* Layout containers */
 .top-container {
   display: grid;
-  grid-template-columns: 260px 1fr;
+  grid-template-columns: 280px 1fr;
   gap: 16px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 .bottom-container {
   display: grid;
-  grid-template-columns: 260px 1fr 260px 260px;
+  grid-template-columns: 280px 1fr 280px 320px;
   gap: 16px;
+  /* grid-template-rows locked by JS after grid renders */
 }
 
 /* Boxes */
@@ -121,6 +127,15 @@ button:disabled {
   padding: 12px 14px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.4);
   border: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+/* Grid box: sizes ONLY to its own content. Must not stretch or clip. */
+.album-grid-box {
+  align-self: start;
+  overflow: visible;
 }
 
 /* Stats */
@@ -136,16 +151,23 @@ button:disabled {
 }
 
 /* Album list */
-.albums-box {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
 .albums-box h2 { flex-shrink: 0; }
-#search { flex-shrink: 0; }
+#search { 
+  flex-shrink: 0;
+  width: 100%;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+  border: 1px solid #444;
+  background: #111;
+  color: #eee;
+  font-size: 13px;
+  box-sizing: border-box;
+}
 #album-list {
   overflow-y: auto;
-  max-height: calc(100vh - 200px);
+  flex: 1;
+  min-height: 0;
 }
 .album-row {
   padding: 4px 0;
@@ -163,12 +185,11 @@ button:disabled {
 
 /* Album grid */
 .album-grid-container {
-  overflow-y: auto;
-  max-height: calc(100vh - 250px);
+  /* no scroll — grid renders all visible items flat */
 }
 .album-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 8px;
 }
 .album-grid-item {
@@ -182,8 +203,8 @@ button:disabled {
   font-size: 11px;
 }
 .album-grid-cover {
-  width: 100px;
-  height: 100px;
+  width: 90px;
+  height: 90px;
   background: #111;
   border-radius: 2px;
   overflow: hidden;
@@ -229,21 +250,18 @@ button:disabled {
   margin-top: 10px;
   padding-top: 8px;
   border-top: 1px solid #333;
+  flex-shrink: 0;
 }
 .pagination-info { font-size: 12px; color: #999; }
 .pagination-buttons { display: flex; gap: 4px; }
 .pagination-buttons button { padding: 4px 8px; font-size: 12px; }
 
 /* Recent Artists */
-.artists-box {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
 .artists-box h2 { flex-shrink: 0; }
 #recent-artists {
   overflow-y: auto;
-  max-height: calc(100vh - 200px);
+  flex: 1;
+  min-height: 0;
 }
 .artist-row {
   display: flex;
@@ -264,11 +282,6 @@ button:disabled {
 .artist-meta { font-size: 11px; color: #999; }
 
 /* Inbox */
-.inbox-box {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
 .inbox-box h2 { flex-shrink: 0; }
 #inbox-summary {
   display: grid;
@@ -286,21 +299,20 @@ button:disabled {
   line-height: 1.4;
   flex-shrink: 0;
 }
+.inbox-scrollable {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
 #inbox-tree {
   margin-top: 10px;
   font-size: 13px;
   color: #ccc;
-  max-height: calc((100vh - 200px) / 2);
-  overflow-y: auto;
-  flex-shrink: 0;
 }
 #inbox-files {
   margin-top: 12px;
   font-size: 13px;
   color: #eee;
-  max-height: calc((100vh - 200px) / 2);
-  overflow-y: auto;
-  flex-shrink: 0;
 }
 #inbox-files ul { padding-left: 16px; margin: 8px 0; }
 #inbox-files li { margin-bottom: 2px; }
@@ -308,19 +320,6 @@ button:disabled {
 .inbox-albums { margin-left: 8px; }
 .inbox-album { cursor: pointer; color: #ccc; margin: 2px 0; }
 .inbox-album:hover { color: #fff; }
-
-/* Search */
-#search {
-  width: 100%;
-  padding: 6px 8px;
-  margin-bottom: 8px;
-  border-radius: 4px;
-  border: 1px solid #444;
-  background: #111;
-  color: #eee;
-  font-size: 13px;
-  box-sizing: border-box;
-}
 
 /* Loading indicator */
 #loading {
@@ -334,6 +333,39 @@ button:disabled {
   z-index: 999;
   font-size: 12px;
   color: #0ff;
+}
+
+/* Debug console */
+.debug-console {
+  position: fixed;
+  bottom: 10px;
+  right: 10px;
+  background: #1a1a1a;
+  border: 1px solid #f00;
+  border-radius: 4px;
+  padding: 8px;
+  max-width: 400px;
+  max-height: 200px;
+  overflow-y: auto;
+  font-family: monospace;
+  font-size: 11px;
+  color: #0f0;
+  z-index: 1000;
+  display: none;
+}
+.debug-console.active {
+  display: block;
+}
+.debug-line {
+  margin: 2px 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.debug-error {
+  color: #f00;
+}
+.debug-warning {
+  color: #ff0;
 }
 
 /* ==================== ALBUMS PAGE ==================== */
@@ -429,6 +461,21 @@ button:disabled {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+#albums-search {
+  width: calc(100% - 32px);
+  padding: 10px 16px;
+  margin: 16px;
+  border-radius: 6px;
+  border: 1px solid #555;
+  background: #2a2a2a;
+  color: #eee;
+  font-size: 14px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+#albums-search::placeholder {
+  color: #888;
 }
 .albums-detail-header {
   display: flex;
@@ -526,6 +573,123 @@ button:disabled {
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
+.tracklist-table tbody tr {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.tracklist-table tbody tr:hover {
+  background: #2a2a2a !important;
+}
+.tracklist-table tbody tr.playing {
+  background: #1a3a3a !important;
+}
+.tracklist-table tbody tr.playing .track-title {
+  color: #0ff;
+}
+
+/* Audio Player Box */
+.audio-player-box {
+  background: #1a1a1a;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px;
+  border: 1px solid #333;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  flex-shrink: 0;
+}
+.audio-player-box h3 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: #0ff;
+  font-weight: 600;
+}
+.now-playing-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.now-playing-cover {
+  width: 60px;
+  height: 60px;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid #444;
+  background: #111;
+  flex-shrink: 0;
+}
+.now-playing-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.now-playing-text {
+  flex: 1;
+  min-width: 0;
+}
+.now-playing-track {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+.now-playing-artist {
+  font-size: 12px;
+  color: #0ff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.now-playing-album {
+  font-size: 11px;
+  color: #888;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Plyr.js Custom Styling */
+.plyr--audio .plyr__controls {
+  background: #222;
+  border-radius: 6px;
+  padding: 12px;
+  border: 1px solid #333;
+}
+.plyr__control--overlaid {
+  background: #f0f;
+}
+.plyr__control--overlaid:hover {
+  background: #f0a;
+}
+.plyr__control:hover {
+  background: #f0f;
+}
+.plyr--audio .plyr__control.plyr__tab-focus,
+.plyr--audio .plyr__control:hover,
+.plyr--audio .plyr__control[aria-expanded=true] {
+  background: #f0f;
+  color: #fff;
+}
+.plyr--full-ui input[type=range] {
+  color: #f0f;
+}
+.plyr__menu__container .plyr__control[role=menuitemradio][aria-checked=true]::before {
+  background: #f0f;
+}
+.plyr--audio .plyr__progress__buffer {
+  color: rgba(240, 0, 240, 0.25);
+}
+
+/* Empty state for audio player */
+.audio-player-empty {
+  padding: 24px;
+  text-align: center;
+  color: #666;
+  font-size: 13px;
+}
 
 /* Empty state */
 .albums-detail-empty {
@@ -550,10 +714,14 @@ button:disabled {
 <div class="nav-tabs">
   <button class="nav-tab active" data-page="main">Main</button>
   <button class="nav-tab" data-page="albums">Albums</button>
+  <button class="nav-tab" id="debug-toggle" style="margin-left: auto;">Debug</button>
 </div>
 
 <!-- Loading indicator -->
 <div id="loading" style="display:none;">Loading...</div>
+
+<!-- Debug console -->
+<div id="debug-console" class="debug-console"></div>
 
 <!-- ==================== MAIN PAGE ==================== -->
 <div class="page active" id="page-main">
@@ -576,7 +744,7 @@ button:disabled {
         <button id="importBtn">Import Inbox</button>
         <button id="reimportBtn">Full Re-import Library</button>
         <button id="refreshBtn">Refresh Library</button>
-        <button id="extractBtn">Extract Covers & Refresh</button>
+        <button id="extractBtn">Extract Covers &amp; Refresh</button>
       </div>
       <div id="status">Status: Idle</div>
     </div>
@@ -611,15 +779,17 @@ button:disabled {
     <div class="box inbox-box">
       <h2>Inbox</h2>
       <div id="inbox-summary">
-        <div>Tracks: <span id="inbox-tracks">–</span></div>
-        <div>Artists: <span id="inbox-artists">–</span></div>
-        <div>Albums: <span id="inbox-albums">–</span></div>
-        <div class="full-width">Total time: <span id="inbox-time">–</span></div>
-        <div class="full-width">Total size: <span id="inbox-size">–</span></div>
+        <div>Tracks: <span id="inbox-tracks">Loading…</span></div>
+        <div>Artists: <span id="inbox-artists">Loading…</span></div>
+        <div>Albums: <span id="inbox-albums">Loading…</span></div>
+        <div class="full-width">Total time: <span id="inbox-time">Loading…</span></div>
+        <div class="full-width">Total size: <span id="inbox-size">Loading…</span></div>
       </div>
       <div class="inbox-note">Expandable folders<br />Artist › Albums › Files</div>
-      <div id="inbox-tree"></div>
-      <div id="inbox-files"></div>
+      <div class="inbox-scrollable">
+        <div id="inbox-tree"></div>
+        <div id="inbox-files"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -634,8 +804,9 @@ button:disabled {
     </div>
     <!-- Right detail panel -->
     <div class="albums-detail-panel" id="albums-detail-panel">
+      <input id="albums-search" type="text" placeholder="Search albums or artists…" />
       <div class="albums-detail-empty">
-        <div class="empty-icon">?</div>
+        <div class="empty-icon">??</div>
         <div>Select an album to view its tracks</div>
       </div>
     </div>
@@ -644,12 +815,67 @@ button:disabled {
 
 <!-- JAVASCRIPT -->
 <script>
+// ==================== DEBUG UTILITIES ====================
+
+let debugEnabled = false;
+const debugLines = [];
+const MAX_DEBUG_LINES = 50;
+
+function debugLog(message, type = 'info') {
+  console.log(`[${type.toUpperCase()}]`, message);
+  
+  if (debugEnabled) {
+    const line = document.createElement('div');
+    line.className = 'debug-line';
+    if (type === 'error') line.classList.add('debug-error');
+    if (type === 'warning') line.classList.add('debug-warning');
+    line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+    
+    const console = document.getElementById('debug-console');
+    console.insertBefore(line, console.firstChild);
+    
+    debugLines.push(line);
+    if (debugLines.length > MAX_DEBUG_LINES) {
+      const removed = debugLines.shift();
+      removed.remove();
+    }
+  }
+}
+
+function toggleDebug() {
+  debugEnabled = !debugEnabled;
+  const console = document.getElementById('debug-console');
+  console.classList.toggle('active', debugEnabled);
+  debugLog('Debug console ' + (debugEnabled ? 'enabled' : 'disabled'));
+}
+
+document.getElementById('debug-toggle').addEventListener('click', toggleDebug);
+
+// Keyboard shortcut: Ctrl+D or Cmd+D
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+    e.preventDefault();
+    toggleDebug();
+  }
+});
+
 // ==================== UTILITIES ====================
 
-function showLoading() { document.getElementById("loading").style.display = "block"; }
-function hideLoading() { document.getElementById("loading").style.display = "none"; }
-function setStatus(msg) { document.getElementById("status").textContent = "Status: " + msg; }
-function _safe(v) { return (v === undefined || v === null || v === "") ? "-" : String(v); }
+function showLoading() { 
+  document.getElementById("loading").style.display = "block"; 
+}
+
+function hideLoading() { 
+  document.getElementById("loading").style.display = "none"; 
+}
+
+function setStatus(msg) { 
+  document.getElementById("status").textContent = "Status: " + msg; 
+}
+
+function _safe(v) { 
+  return (v === undefined || v === null || v === "") ? "0" : String(v); 
+}
 
 function fmtTimestamp(epoch) {
   if (!epoch || epoch === 0) return "-";
@@ -658,18 +884,22 @@ function fmtTimestamp(epoch) {
 }
 
 function formatCompactTime(timeStr) {
-  if (!timeStr || timeStr === "0 seconds" || timeStr === "-") return "0 hrs";
+  if (!timeStr || timeStr === "0 seconds" || timeStr === "-" || timeStr === "0") return "0 hrs";
+
   const weekMatch = timeStr.match(/(\d+)\s*week/);
   const dayMatch = timeStr.match(/(\d+)\s*day/);
   const hourMatch = timeStr.match(/(\d+)\s*hour/);
   const minMatch = timeStr.match(/(\d+)\s*minute/);
   const secMatch = timeStr.match(/(\d+)\s*second/);
+
   const weeks = weekMatch ? parseInt(weekMatch[1]) : 0;
   const days = dayMatch ? parseInt(dayMatch[1]) : 0;
   const hours = hourMatch ? parseInt(hourMatch[1]) : 0;
   const minutes = minMatch ? parseInt(minMatch[1]) : 0;
   const seconds = secMatch ? parseInt(secMatch[1]) : 0;
+
   const totalHours = (weeks*7*24) + (days*24) + hours + (minutes/60) + (seconds/3600);
+
   if (totalHours >= 24) return (totalHours/24).toFixed(1) + " days";
   if (totalHours >= 1) return totalHours.toFixed(1) + " hrs";
   if (minutes >= 1) return minutes + " min";
@@ -683,9 +913,22 @@ function formatTrackDuration(seconds) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+// ==================== FIXED COVER URL LOGIC ====================
+
 function coverUrlFor(album) {
-  if (album && album.folder) return "/music/library" + album.folder + "/cover.jpg";
-  return "/static/placeholder.jpg";
+  // Your backend sometimes uses "folder", "path", "directory", or "example_path"
+  const folder =
+    album?.folder ||
+    album?.path ||
+    album?.directory ||
+    album?.example_path;
+
+  if (!folder) return "/static/placeholder.jpg";
+
+  // Normalize slashes and ensure no double slashes
+  const clean = folder.replace(/\/$/, "");
+
+  return `/music/library${clean}/cover.jpg`;
 }
 
 // ==================== NAVIGATION ====================
@@ -695,6 +938,7 @@ const pages = { main: document.getElementById("page-main"), albums: document.get
 
 tabs.forEach(tab => {
   tab.addEventListener("click", () => {
+    if (tab.id === 'debug-toggle') return; // Skip debug button
     tabs.forEach(t => t.classList.remove("active"));
     Object.values(pages).forEach(p => p.classList.remove("active"));
     tab.classList.add("active");
@@ -706,9 +950,16 @@ tabs.forEach(tab => {
 
 let allAlbums = [];
 let filteredAlbums = [];
-const PAGE_SIZE = 20;
+let filteredSidebarAlbums = []; // For Albums page sidebar filtering
+const PAGE_SIZE = 25;  // Show 25 albums at a time (5 columns x 5 rows)
 let gridItemsToShow = PAGE_SIZE;
 let currentSelectedAlbum = null;
+
+// Audio player state
+let player = null;
+let currentPlaylist = [];
+let currentTrackIndex = -1;
+let currentAlbumData = null;
 
 // ==================== STATS ====================
 
@@ -721,12 +972,14 @@ async function loadStats() {
     const statsDiv = document.getElementById("stats");
     statsDiv.innerHTML = "";
     const add = (label, value) => { const d = document.createElement("div"); d.textContent = label + ": " + value; statsDiv.appendChild(d); };
-    add("Tracks", data.tracks ?? "-");
-    add("Albums", data.albums ?? "-");
-    add("Artists", data.album_artists ?? "-");
-    add("Total time", data.total_time ?? "-");
-    add("Total size", data.total_size ?? "-");
-  } catch (e) { console.error("loadStats error", e); }
+    add("Tracks", data.tracks ?? "0");
+    add("Albums", data.albums ?? "0");
+    add("Artists", data.album_artists ?? "0");
+    add("Total time", data.total_time ?? "0");
+    add("Total size", data.total_size ?? "0");
+  } catch (e) { 
+    console.error("loadStats error", e); 
+  }
   finally { hideLoading(); }
 }
 
@@ -735,14 +988,34 @@ async function loadStats() {
 async function loadInboxStats() {
   try {
     const res = await fetch("/api/inbox/stats");
-    if (!res.ok) throw new Error("status " + res.status);
+    
+    if (!res.ok) {
+      console.error("Inbox stats fetch failed:", res.status);
+      throw new Error("status " + res.status);
+    }
+    
     const data = await res.json();
-    document.getElementById("inbox-tracks").textContent = _safe(data?.tracks);
-    document.getElementById("inbox-time").textContent = formatCompactTime(data?.total_time);
-    document.getElementById("inbox-size").textContent = _safe(data?.total_size);
-    document.getElementById("inbox-artists").textContent = _safe(data?.artists);
-    document.getElementById("inbox-albums").textContent = _safe(data?.albums);
-  } catch (err) { console.error("loadInboxStats:", err); }
+    
+    // Update UI with explicit value extraction
+    const tracks = data.tracks !== undefined && data.tracks !== null ? String(data.tracks) : "0";
+    const artists = data.artists !== undefined && data.artists !== null ? String(data.artists) : "0";
+    const albums = data.albums !== undefined && data.albums !== null ? String(data.albums) : "0";
+    const time = data.total_time || "0 seconds";
+    const size = data.total_size || "0 B";
+    
+    document.getElementById("inbox-tracks").textContent = tracks;
+    document.getElementById("inbox-artists").textContent = artists;
+    document.getElementById("inbox-albums").textContent = albums;
+    document.getElementById("inbox-time").textContent = formatCompactTime(time);
+    document.getElementById("inbox-size").textContent = size;
+  } catch (err) { 
+    console.error("Error loading inbox stats:", err); 
+    document.getElementById("inbox-tracks").textContent = "Error";
+    document.getElementById("inbox-artists").textContent = "Error";
+    document.getElementById("inbox-albums").textContent = "Error";
+    document.getElementById("inbox-time").textContent = "Error";
+    document.getElementById("inbox-size").textContent = "Error";
+  }
 }
 
 function renderInboxTree(tree) {
@@ -771,7 +1044,10 @@ async function loadInboxTree() {
     if (!res.ok) throw new Error("status " + res.status);
     const data = await res.json();
     renderInboxTree(data.folders || data);
-  } catch (err) { console.error("loadInboxTree:", err); renderInboxTree({}); }
+  } catch (err) { 
+    console.error("Error loading inbox tree:", err); 
+    renderInboxTree({}); 
+  }
 }
 
 async function loadInboxFolder(artist, album) {
@@ -804,14 +1080,34 @@ async function loadAlbums() {
     const res = await fetch("/data/albums.json");
     if (!res.ok) throw new Error("status " + res.status);
     const data = await res.json();
-    allAlbums = Array.isArray(data) ? data.sort((a,b) => (b._mtime || 0) - (a._mtime || 0)) : [];
+    
+    debugLog(`Loaded ${data.length} albums from albums.json`);
+    
+    // Log first album structure for debugging
+    if (data.length > 0) {
+      debugLog(`Sample album keys: ${Object.keys(data[0]).join(', ')}`);
+      if (data[0].tracks && data[0].tracks.length > 0) {
+        debugLog(`Sample track keys: ${Object.keys(data[0].tracks[0]).join(', ')}`);
+      }
+    }
+    
+    // Sort by newest first, using multiple timestamp fields as fallbacks
+    allAlbums = Array.isArray(data) ? data.sort((a,b) => {
+      const aTime = a._mtime || a.mtime || a.added || 0;
+      const bTime = b._mtime || b.mtime || b.added || 0;
+      return bTime - aTime; // Descending order (newest first)
+    }) : [];
     filteredAlbums = allAlbums.slice();
+    filteredSidebarAlbums = allAlbums.slice();
     gridItemsToShow = PAGE_SIZE;
     renderAlbums();
     renderAlbumGrid();
     renderRecentArtists(allAlbums);
     renderAlbumsSidebar();
-  } catch (e) { console.error("loadAlbums error", e); }
+  } catch (e) { 
+    console.error("loadAlbums error", e);
+    debugLog(`Error loading albums: ${e.message}`, 'error');
+  }
   finally { hideLoading(); }
 }
 
@@ -855,6 +1151,15 @@ function renderAlbumGrid() {
   if (pageInfo) pageInfo.textContent = `Showing ${itemsToDisplay} of ${albums.length}`;
   const btn = document.getElementById("grid-load-more");
   if (btn) { btn.disabled = itemsToDisplay >= albums.length; btn.textContent = btn.disabled ? "All Loaded" : "Load More"; }
+
+  // Lock the grid row height to the album-grid-box so the other three columns scroll within it
+  requestAnimationFrame(() => {
+    const gridBox = document.querySelector(".album-grid-box");
+    const container = document.querySelector(".bottom-container");
+    if (gridBox && container) {
+      container.style.gridTemplateRows = gridBox.getBoundingClientRect().height + "px";
+    }
+  });
 }
 
 function filterAlbums() {
@@ -892,12 +1197,12 @@ function renderAlbumsSidebar() {
   const container = document.getElementById("albums-sidebar-list");
   if (!container) return;
   container.innerHTML = "";
-  // Show all albums sorted by mtime (most recent first)
-  allAlbums.forEach((a, idx) => {
+  filteredSidebarAlbums.forEach((a, idx) => {
     const item = document.createElement("div");
     item.className = "sidebar-album-item";
     item.dataset.idx = idx;
-    item.onclick = () => selectAlbum(idx);
+    item.dataset.originalIdx = allAlbums.indexOf(a); // Store original index for selection
+    item.onclick = () => selectAlbum(allAlbums.indexOf(a));
 
     const thumb = document.createElement("div"); thumb.className = "sidebar-album-thumb";
     const img = document.createElement("img"); img.src = coverUrlFor(a);
@@ -916,32 +1221,47 @@ function renderAlbumsSidebar() {
   });
 }
 
+function filterSidebarAlbums() {
+  const q = (document.getElementById("albums-search")?.value || "").toLowerCase().trim();
+  filteredSidebarAlbums = q 
+    ? allAlbums.filter(a => ((a.album||"") + " " + (a.albumartist||a.artist||"")).toLowerCase().includes(q)) 
+    : allAlbums.slice();
+  renderAlbumsSidebar();
+}
+
 function selectAlbum(idx) {
   currentSelectedAlbum = idx;
-  // Highlight in sidebar
   document.querySelectorAll(".sidebar-album-item").forEach(el => el.classList.remove("active"));
-  const selected = document.querySelector(`.sidebar-album-item[data-idx="${idx}"]`);
+  const selected = document.querySelector(`.sidebar-album-item[data-original-idx="${idx}"]`);
   if (selected) selected.classList.add("active");
-  // Render detail
   renderAlbumDetail(allAlbums[idx]);
 }
 
 function renderAlbumDetail(album) {
   const panel = document.getElementById("albums-detail-panel");
+  const searchBox = document.getElementById("albums-search");
+  
   if (!album) {
-    panel.innerHTML = '<div class="albums-detail-empty"><div class="empty-icon">?</div><div>Select an album to view its tracks</div></div>';
+    panel.innerHTML = "";
+    if (searchBox) panel.appendChild(searchBox);
+    const empty = document.createElement("div");
+    empty.className = "albums-detail-empty";
+    empty.innerHTML = '<div class="empty-icon">??</div><div>Select an album to view its tracks</div>';
+    panel.appendChild(empty);
     return;
   }
 
-  // Build tracklist from album.tracks if available, otherwise show a message
-  const tracks = album.tracks || [];
+  debugLog(`Rendering album: ${album.album}`);
+  debugLog(`Album path/folder: ${album.path || album.folder || album.directory || 'NONE'}`);
+  debugLog(`Tracks count: ${album.tracks?.length || 0}`);
 
+  const tracks = album.tracks || [];
   let totalSeconds = 0;
   tracks.forEach(t => { totalSeconds += (t.length || 0); });
 
   panel.innerHTML = "";
+  if (searchBox) panel.appendChild(searchBox);
 
-  // Header
   const header = document.createElement("div"); header.className = "albums-detail-header";
   const coverWrap = document.createElement("div"); coverWrap.className = "albums-detail-cover";
   const coverImg = document.createElement("img"); coverImg.src = coverUrlFor(album);
@@ -960,7 +1280,6 @@ function renderAlbumDetail(album) {
   header.appendChild(coverWrap); header.appendChild(info);
   panel.appendChild(header);
 
-  // Tracklist
   const trackContainer = document.createElement("div"); trackContainer.className = "tracklist-container";
 
   if (tracks.length === 0) {
@@ -980,6 +1299,11 @@ function renderAlbumDetail(album) {
     const tbody = document.createElement("tbody");
     tracks.forEach((t, i) => {
       const tr = document.createElement("tr");
+      tr.dataset.trackIndex = i;
+      
+      // Make track row clickable
+      tr.onclick = () => playTrack(album, i);
+      
       const numTd = document.createElement("td"); numTd.className = "track-num"; numTd.textContent = (t.track || (i+1));
       const titleTd = document.createElement("td"); titleTd.className = "track-title"; titleTd.textContent = t.title || "(Untitled)";
       const artistTd = document.createElement("td"); artistTd.textContent = t.artist || album.albumartist || album.artist || "";
@@ -991,6 +1315,269 @@ function renderAlbumDetail(album) {
     trackContainer.appendChild(table);
   }
   panel.appendChild(trackContainer);
+
+  // Add audio player box
+  const playerBox = document.createElement("div");
+  playerBox.className = "audio-player-box";
+  playerBox.id = "audio-player-box";
+  
+  const playerTitle = document.createElement("h3");
+  playerTitle.textContent = "Now Playing";
+  playerBox.appendChild(playerTitle);
+
+  // Now playing info
+  const nowPlayingInfo = document.createElement("div");
+  nowPlayingInfo.className = "now-playing-info";
+  nowPlayingInfo.id = "now-playing-info";
+  nowPlayingInfo.innerHTML = '<div class="audio-player-empty">Click a track to start playing</div>';
+  playerBox.appendChild(nowPlayingInfo);
+
+  // Audio element
+  const audioEl = document.createElement("audio");
+  audioEl.id = "audio-player";
+  audioEl.controls = true;
+  playerBox.appendChild(audioEl);
+
+  panel.appendChild(playerBox);
+
+  // Initialize Plyr
+  initializePlayer();
+  
+  // Store current album data for player
+  currentAlbumData = album;
+  currentPlaylist = tracks;
+}
+
+// ==================== AUDIO PLAYER ====================
+
+function initializePlayer() {
+  const audioEl = document.getElementById("audio-player");
+  if (!audioEl) return;
+
+  // Destroy existing player if it exists
+  if (player) {
+    player.destroy();
+  }
+
+  // Initialize Plyr with full features
+  player = new Plyr(audioEl, {
+    controls: [
+      'play-large',
+      'play',
+      'progress',
+      'current-time',
+      'duration',
+      'mute',
+      'volume',
+      'settings',
+      'download'
+    ],
+    settings: ['speed', 'loop'],
+    speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] },
+    keyboard: { focused: true, global: true }
+  });
+
+  // Handle track ended event for auto-play next
+  player.on('ended', () => {
+    playNextTrack();
+  });
+
+  // Add error handler
+  player.on('error', (event) => {
+    debugLog(`Player error: ${JSON.stringify(event)}`, 'error');
+  });
+}
+
+function getTrackPath(album, track) {
+  debugLog(`Getting track path for: ${track.title}`);
+  debugLog(`Track object: ${JSON.stringify(track, null, 2)}`);
+  debugLog(`Album object keys: ${Object.keys(album).join(', ')}`);
+  
+  // Try multiple possible path fields from the track
+  let trackPath = track.path || track.file || track.filename || track._path;
+  
+  debugLog(`Track path field: ${trackPath || 'NONE'}`);
+  
+  // If track has a full path (starts with /)
+  if (trackPath && trackPath.startsWith('/')) {
+    // Check if it already starts with /music/library
+    if (trackPath.startsWith('/music/library')) {
+      debugLog(`Using full track path (already prefixed): ${trackPath}`);
+      return trackPath;
+    } else {
+      const fullPath = `/music/library${trackPath}`;
+      debugLog(`Using full track path: ${fullPath}`);
+      return fullPath;
+    }
+  }
+  
+  // Otherwise, build from album folder + track filename
+  const albumFolder = album.path || album.folder || album.directory || album.example_path || album._path;
+  debugLog(`Album folder: ${albumFolder || 'NONE'}`);
+  
+  if (albumFolder && trackPath) {
+    // Clean up paths
+    const cleanFolder = albumFolder.replace(/\/$/, ''); // Remove trailing slash
+    const cleanTrack = trackPath.replace(/^\//, ''); // Remove leading slash
+    const fullPath = `/music/library${cleanFolder}/${cleanTrack}`;
+    debugLog(`Built path: ${fullPath}`);
+    return fullPath;
+  }
+  
+  // Last resort: try to extract filename from track.title and use album folder
+  if (albumFolder && track.title) {
+    // Common audio extensions
+    const extensions = ['.flac', '.mp3', '.m4a', '.ogg', '.wav', '.opus'];
+    for (const ext of extensions) {
+      const possiblePath = `/music/library${albumFolder}/${track.title}${ext}`;
+      debugLog(`Trying extension guess: ${possiblePath}`, 'warning');
+      return possiblePath;
+    }
+  }
+  
+  debugLog('Could not determine track path!', 'error');
+  return null;
+}
+
+function playTrack(album, trackIndex) {
+  const track = album.tracks[trackIndex];
+  if (!track) {
+    debugLog('Track not found at index ' + trackIndex, 'error');
+    return;
+  }
+
+  debugLog(`=== PLAYING TRACK ${trackIndex} ===`);
+  const trackPath = getTrackPath(album, track);
+  
+  if (!trackPath) {
+    debugLog("Could not determine track path", 'error');
+    alert('Cannot play this track - path could not be determined. Check debug console for details.');
+    return;
+  }
+
+  debugLog(`Final track path: ${trackPath}`);
+  
+  currentTrackIndex = trackIndex;
+  currentAlbumData = album;
+  currentPlaylist = album.tracks;
+
+  // Update player source
+  if (player) {
+    const mimeType = getAudioMimeType(trackPath);
+    debugLog(`MIME type: ${mimeType}`);
+    
+    player.source = {
+      type: 'audio',
+      sources: [
+        {
+          src: trackPath,
+          type: mimeType
+        }
+      ]
+    };
+    
+    // Try to play and log result
+    player.play().then(() => {
+      debugLog('Playback started successfully');
+    }).catch((error) => {
+      debugLog(`Playback failed: ${error.message}`, 'error');
+      alert(`Failed to play track. Check debug console.\nPath: ${trackPath}\nError: ${error.message}`);
+    });
+  } else {
+    debugLog('Player not initialized', 'error');
+    debugLog('Attempting to reinitialize player...', 'warning');
+    initializePlayer();
+    // Try again after initialization
+    setTimeout(() => playTrack(album, trackIndex), 100);
+  }
+
+  // Update now playing info
+  updateNowPlayingInfo(album, track);
+  
+  // Update track row highlighting
+  updateTrackHighlight(trackIndex);
+}
+
+function getAudioMimeType(path) {
+  const ext = path.split('.').pop().toLowerCase();
+  const mimeTypes = {
+    'flac': 'audio/flac',
+    'mp3': 'audio/mpeg',
+    'wav': 'audio/wav',
+    'ogg': 'audio/ogg',
+    'opus': 'audio/opus',
+    'm4a': 'audio/mp4',
+    'aac': 'audio/aac',
+    'weba': 'audio/webm'
+  };
+  return mimeTypes[ext] || 'audio/mpeg';
+}
+
+function updateNowPlayingInfo(album, track) {
+  const infoDiv = document.getElementById("now-playing-info");
+  if (!infoDiv) return;
+
+  infoDiv.innerHTML = "";
+
+  const coverDiv = document.createElement("div");
+  coverDiv.className = "now-playing-cover";
+  const coverImg = document.createElement("img");
+  coverImg.src = coverUrlFor(album);
+  coverImg.onerror = () => { coverImg.onerror = null; coverImg.src = "/static/placeholder.jpg"; };
+  coverDiv.appendChild(coverImg);
+
+  const textDiv = document.createElement("div");
+  textDiv.className = "now-playing-text";
+
+  const trackTitle = document.createElement("div");
+  trackTitle.className = "now-playing-track";
+  trackTitle.textContent = track.title || "(Untitled)";
+
+  const artistName = document.createElement("div");
+  artistName.className = "now-playing-artist";
+  artistName.textContent = track.artist || album.albumartist || album.artist || "";
+
+  const albumName = document.createElement("div");
+  albumName.className = "now-playing-album";
+  albumName.textContent = album.album || "";
+
+  textDiv.appendChild(trackTitle);
+  textDiv.appendChild(artistName);
+  textDiv.appendChild(albumName);
+
+  infoDiv.appendChild(coverDiv);
+  infoDiv.appendChild(textDiv);
+}
+
+function updateTrackHighlight(trackIndex) {
+  // Remove previous highlighting
+  document.querySelectorAll(".tracklist-table tbody tr").forEach(tr => {
+    tr.classList.remove("playing");
+  });
+
+  // Add highlighting to current track
+  const currentRow = document.querySelector(`.tracklist-table tbody tr[data-track-index="${trackIndex}"]`);
+  if (currentRow) {
+    currentRow.classList.add("playing");
+  }
+}
+
+function playNextTrack() {
+  if (!currentPlaylist || currentPlaylist.length === 0) return;
+  
+  const nextIndex = currentTrackIndex + 1;
+  if (nextIndex < currentPlaylist.length) {
+    playTrack(currentAlbumData, nextIndex);
+  }
+}
+
+function playPreviousTrack() {
+  if (!currentPlaylist || currentPlaylist.length === 0) return;
+  
+  const prevIndex = currentTrackIndex - 1;
+  if (prevIndex >= 0) {
+    playTrack(currentAlbumData, prevIndex);
+  }
 }
 
 // ==================== BUTTON ACTIONS ====================
@@ -1045,8 +1632,13 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("extractBtn").onclick = extractCovers;
   document.getElementById("grid-load-more").onclick = () => { gridItemsToShow += PAGE_SIZE; renderAlbumGrid(); };
   document.getElementById("search").addEventListener("input", filterAlbums);
+  document.getElementById("albums-search").addEventListener("input", filterSidebarAlbums);
 
-  setInterval(() => { loadStats(); loadInboxStats(); loadInboxTree(); }, 60000);
+  setInterval(() => { 
+    loadStats(); 
+    loadInboxStats(); 
+    loadInboxTree(); 
+  }, 60000);
 });
 </script>
 </body>

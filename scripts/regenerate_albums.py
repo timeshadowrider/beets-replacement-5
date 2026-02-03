@@ -1,29 +1,25 @@
 #!/usr/bin/env python3
-"""
-regenerate_albums.py
-
-Full or targeted regeneration of /data/albums.json using beets.
-- Explicit subprocess calls (no shell expansion).
-- Debug logging to /data/albums-beet.log.
-- Adds full track metadata, album totals, and cover art.
-"""
-
 import json
 import subprocess
-import sys
 import os
-from datetime import datetime
+import logging
+from pathlib import Path
 
 BEETS_CONFIG = "/config/config.yaml"
 OUT_DIR = "/data"
-OUT_PATH = os.path.join(OUT_DIR, "albums.json")
-BEET_LOG = os.path.join(OUT_DIR, "albums-beet.log")
+ALBUMS_FILE = os.path.join(OUT_DIR, "albums.json")
 LIB_ROOT = "/music/library"
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler(os.path.join(OUT_DIR, "regen.log")),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger("regen")
 
-# ---------------------------------------------------------------------------
-# UTIL
-# ---------------------------------------------------------------------------
 
 def run_beet(args):
     try:
@@ -32,49 +28,55 @@ def run_beet(args):
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
-            check=False
+            check=False,
+            timeout=300
         )
         return p.stdout or ""
     except Exception as e:
-        return f"beet invocation failed: {e}\n"
+        logger.error(f"Beet command failed: {e}")
+        return ""
 
 
-def log(out):
-    try:
-        os.makedirs(OUT_DIR, exist_ok=True)
-        with open(BEET_LOG, "a", encoding="utf-8") as f:
-            f.write(f"\n--- {datetime.utcnow().isoformat()} ---\n")
-            f.write(out)
-    except Exception:
-        pass
+def get_all_albums():
+    fmt = "$id\t$albumartist\t$album\t$year"
+    args = ["beet", "-c", BEETS_CONFIG, "list", "-a", "-f", fmt]
+    out = run_beet(args)
+
+    albums = []
+    for line in out.splitlines():
+        parts = line.split("\t")
+        if len(parts) < 4:
+            continue
+        album_id, artist, album, year = parts
+        if not album_id.isdigit():
+            continue
+        albums.append({
+            "id": int(album_id),
+            "albumartist": artist,
+            "album": album,
+            "year": year
+        })
+    return albums
 
 
-# ---------------------------------------------------------------------------
-# TRACKS
-# ---------------------------------------------------------------------------
-
-def get_tracks(albumartist, album):
+def get_tracks_for_album(album_id):
     fmt = "$disc\t$track\t$title\t$length\t$bitrate\t$format\t$path"
     args = [
-        "beet", "-c", BEETS_CONFIG,
-        "list", "-t",
-        f"albumartist:{albumartist}",
-        f"album:{album}",
-        "-f", fmt
+        "beet", "-c", BEETS_CONFIG, "list", "-f", fmt,
+        f"album_id:{album_id}"
     ]
-
     out = run_beet(args)
-    log(out)
 
     tracks = []
     total_length = 0
+    first_path = None
 
     for line in out.splitlines():
         parts = line.split("\t")
         if len(parts) < 7:
             continue
 
-        disc, track, title, length, bitrate, fmtc, path = (p.strip() for p in parts)
+        disc, track, title, length, bitrate, fmtc, path = parts
 
         try:
             disc = int(disc)
@@ -96,7 +98,8 @@ def get_tracks(albumartist, album):
         except Exception:
             bitrate = None
 
-        rel_path = path.replace(LIB_ROOT, "")
+        if first_path is None:
+            first_path = path
 
         if length:
             total_length += length
@@ -108,151 +111,103 @@ def get_tracks(albumartist, album):
             "length": length,
             "bitrate": bitrate,
             "format": fmtc,
-            "path": rel_path,
+            "path": path
         })
 
     tracks.sort(key=lambda t: (t["disc"], t["track"] or 0))
-    return tracks, total_length
+    return tracks, total_length, first_path
 
 
-# ---------------------------------------------------------------------------
-# COVER ART
-# ---------------------------------------------------------------------------
-
-def get_cover(albumartist, album):
-    args = [
-        "beet", "-c", BEETS_CONFIG,
-        "list", "-a",
-        f"albumartist:{albumartist}",
-        f"album:{album}",
-        "-f", "$artpath"
+def find_cover(folder):
+    candidates = [
+        "cover.jpg", "cover.png",
+        "folder.jpg", "folder.png",
+        "front.jpg", "front.png"
     ]
-
-    out = run_beet(args)
-    log(out)
-
-    for line in out.splitlines():
-        art = line.strip()
-        if art and os.path.exists(art):
-            return art.replace(LIB_ROOT, "")
-
+    for c in candidates:
+        p = os.path.join(folder, c)
+        if os.path.exists(p):
+            return p
     return None
 
 
-# ---------------------------------------------------------------------------
-# ALBUMS
-# ---------------------------------------------------------------------------
+def to_relative_folder(folder_abs: str) -> str:
+    """
+    Convert an absolute folder path under LIB_ROOT into a
+    relative path like '/Artist/Album' for the frontend.
+    """
+    try:
+        rel = os.path.relpath(folder_abs, LIB_ROOT)
+    except ValueError:
+        # If something is weird, fall back to just stripping LIB_ROOT prefix
+        if folder_abs.startswith(LIB_ROOT):
+            rel = folder_abs[len(LIB_ROOT):]
+        else:
+            rel = folder_abs
 
-def run_beet_list(query=None):
-    base_fmt = "$albumartist\t$album\t$year\t$path"
-    args = ["beet", "-c", BEETS_CONFIG, "list", "-a"]
+    rel = rel.replace("\\", "/").strip("/")
+    return "/" + rel if rel else ""
 
-    if query:
-        args.append(query)
 
-    args.extend(["-f", base_fmt])
+def to_relative_cover(cover_abs: str) -> str:
+    """
+    Convert an absolute cover path into a relative path
+    rooted at /music/library, e.g. '/Artist/Album/cover.jpg'.
+    """
+    if not cover_abs:
+        return None
 
-    out = run_beet(args)
-    log(out)
+    # Expect cover_abs to be under LIB_ROOT
+    folder_abs = os.path.dirname(cover_abs)
+    rel_folder = to_relative_folder(folder_abs)
+    return rel_folder + "/cover.jpg"
 
-    albums = []
-    seen = set()
 
-    for line in out.splitlines():
-        parts = line.split("\t")
-        if len(parts) < 4:
+def regenerate():
+    logger.info("Starting full regeneration")
+
+    albums = get_all_albums()
+    logger.info(f"Found {len(albums)} albums")
+
+    output = []
+
+    for a in albums:
+        logger.info(f"Processing: {a['albumartist']} - {a['album']}")
+
+        tracks, total_length, first_path = get_tracks_for_album(a["id"])
+
+        if not tracks or not first_path:
+            logger.warning(f"No tracks found for album ID {a['id']}")
             continue
 
-        albumartist, album, year, path = (p.strip() for p in parts[:4])
+        # first_path is a full path like /music/library/Artist/Album/track.flac
+        folder_abs = os.path.dirname(first_path)
+        cover_abs = find_cover(folder_abs)
 
-        if not albumartist or not album:
-            continue
-        if path == LIB_ROOT:
-            continue
+        folder_rel = to_relative_folder(folder_abs)
+        cover_rel = to_relative_cover(cover_abs) if cover_abs else None
 
-        key = (albumartist, album, year)
-        if key in seen:
-            continue
-        seen.add(key)
-
-        folder = path.replace(LIB_ROOT, "")
-
-        tracks, total_length = get_tracks(albumartist, album)
-        cover = get_cover(albumartist, album)
-
-        albums.append({
-            "albumartist": albumartist,
-            "album": album,
-            "year": year,
-            "folder": folder,
-            "cover": cover,
+        album_obj = {
+            "albumartist": a["albumartist"],
+            "album": a["album"],
+            "year": a["year"],
+            # frontend uses this to build /music/library + folder + /cover.jpg
+            "folder": folder_rel,
+            # optional, but now also relative and consistent
+            "cover": cover_rel,
             "track_count": len(tracks),
             "total_length": total_length,
-            "tracks": tracks,
-        })
+            "tracks": tracks
+        }
 
-    return albums
+        output.append(album_obj)
 
-
-# ---------------------------------------------------------------------------
-# FILE HANDLING
-# ---------------------------------------------------------------------------
-
-def write_albums(albums):
     os.makedirs(OUT_DIR, exist_ok=True)
-    with open(OUT_PATH, "w", encoding="utf-8") as f:
-        json.dump(albums, f, ensure_ascii=False, indent=2)
-    print(f"wrote {len(albums)} albums to {OUT_PATH}")
+    with open(ALBUMS_FILE, "w", encoding="utf-8") as f:
+        json.dump(output, f, ensure_ascii=False, indent=2)
 
-
-def load_existing():
-    if not os.path.exists(OUT_PATH):
-        return []
-    try:
-        with open(OUT_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return []
-
-
-def merge(existing, new):
-    new_map = {
-        (a["albumartist"], a["album"], a["year"]): a
-        for a in new
-    }
-
-    merged = [
-        e for e in existing
-        if (e.get("albumartist"), e.get("album"), e.get("year")) not in new_map
-    ]
-
-    merged.extend(new_map.values())
-    return merged
-
-
-# ---------------------------------------------------------------------------
-# MAIN
-# ---------------------------------------------------------------------------
-
-def main():
-    arg = sys.argv[1] if len(sys.argv) > 1 else None
-
-    if arg:
-        query = f'path:"{arg}"'
-        new_albums = run_beet_list(query)
-
-        if not new_albums:
-            print("no albums found for target", file=sys.stderr)
-            sys.exit(1)
-
-        merged = merge(load_existing(), new_albums)
-        write_albums(merged)
-        print(f"targeted regen: {len(new_albums)} album(s)")
-        return
-
-    albums = run_beet_list()
-    write_albums(albums)
+    logger.info(f"Saved {len(output)} albums to {ALBUMS_FILE}")
 
 
 if __name__ == "__main__":
-    main()
+    regenerate()

@@ -59,17 +59,11 @@ body {
 /* ==================== PAGE CONTENT ==================== */
 
 .page {
-  display: none !important;
+  display: none;
   padding: 12px 16px;
 }
 .page.active {
-  display: block !important;
-}
-#page-watcher {
-  padding: 12px 16px !important;
-}
-#page-watcher.active {
-  display: block !important;
+  display: block;
 }
 
 /* Headings */
@@ -371,36 +365,23 @@ button:disabled {
 
 /* ==================== ALBUMS PAGE ==================== */
 
-#page-albums {
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  height: calc(100vh - 85px);
-  gap: 12px;
-}
-
-/* Top section: Search + Album Info */
-.albums-top-section {
-  display: grid;
-  grid-template-columns: 300px 1fr;
-  gap: 12px;
-}
-
-.albums-search-container {
+.albums-page-header {
   background: #222;
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 16px;
+  margin-bottom: 16px;
   border: 1px solid #333;
   box-shadow: 0 2px 6px rgba(0,0,0,0.4);
 }
 
 #albums-search {
   width: 100%;
-  padding: 7px 10px;
+  padding: 12px 16px;
   border-radius: 6px;
   border: 1px solid #555;
   background: #1a1a1a;
   color: #eee;
-  font-size: 13px;
+  font-size: 15px;
   box-sizing: border-box;
   transition: border-color 0.2s, background 0.2s;
 }
@@ -415,81 +396,11 @@ button:disabled {
   color: #888;
 }
 
-.albums-info-placeholder {
-  background: #222;
-  border-radius: 8px;
-  padding: 10px 12px;
-  border: 1px solid #333;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-}
-
-.albums-current-album-info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 34px;
-}
-
-.albums-current-album-info.empty::after {
-  content: 'Select an album to view details';
-  color: #666;
-  font-size: 13px;
-}
-
-.albums-current-album-cover {
-  width: 50px;
-  height: 50px;
-  border-radius: 4px;
-  overflow: hidden;
-  border: 1px solid #444;
-  background: #111;
-  flex-shrink: 0;
-}
-
-.albums-current-album-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.albums-current-album-text {
-  flex: 1;
-  min-width: 0;
-}
-
-.albums-current-album-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #fff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-bottom: 2px;
-}
-
-.albums-current-album-artist {
-  font-size: 12px;
-  color: #0ff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.albums-current-album-meta {
-  font-size: 11px;
-  color: #888;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Middle section: Sidebar + Track list */
-.albums-middle-section {
+.albums-page-layout {
   display: grid;
   grid-template-columns: 240px 1fr;
-  gap: 12px;
-  min-height: 0;
-  overflow: hidden;
+  gap: 16px;
+  height: calc(100vh - 140px);
 }
 
 /* Left sidebar: recent album list */
@@ -501,19 +412,15 @@ button:disabled {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  min-height: 0;
 }
 .albums-sidebar h2 {
-  padding: 10px 12px;
-  margin: 0;
+  padding: 12px 14px 0 14px;
   flex-shrink: 0;
-  border-bottom: 1px solid #333;
 }
 .albums-sidebar-list {
   overflow-y: auto;
   flex: 1;
-  padding: 8px;
-  min-height: 0;
+  padding: 8px 10px;
 }
 .sidebar-album-item {
   display: flex;
@@ -580,15 +487,57 @@ button:disabled {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  min-height: 0;
+}
+.albums-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border-bottom: 1px solid #333;
+  flex-shrink: 0;
+}
+.albums-detail-cover {
+  width: 100px;
+  height: 100px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #444;
+  flex-shrink: 0;
+  background: #111;
+}
+.albums-detail-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.albums-detail-info {
+  flex: 1;
+  min-width: 0;
+}
+.albums-detail-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.albums-detail-artist {
+  font-size: 14px;
+  color: #0ff;
+  margin-bottom: 4px;
+}
+.albums-detail-meta {
+  font-size: 12px;
+  color: #888;
 }
 
 /* Tracklist table */
 .tracklist-container {
   overflow-y: auto;
   flex: 1;
-  padding: 2px 0;
-  min-height: 0;
+  padding: 8px 0;
 }
 .tracklist-table {
   width: 100%;
@@ -596,20 +545,20 @@ button:disabled {
 }
 .tracklist-table th {
   text-align: left;
-  font-size: 10px;
+  font-size: 11px;
   color: #666;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  padding: 3px 12px;
+  padding: 6px 16px;
   border-bottom: 1px solid #333;
   position: sticky;
   top: 0;
   background: #222;
 }
 .tracklist-table td {
-  padding: 3px 12px;
-  font-size: 12px;
+  padding: 8px 16px;
+  font-size: 13px;
   color: #ccc;
   border-bottom: 1px solid #2a2a2a;
 }
@@ -622,8 +571,8 @@ button:disabled {
 }
 .track-num {
   color: #666;
-  font-size: 11px;
-  width: 28px;
+  font-size: 12px;
+  width: 32px;
 }
 .track-title {
   font-weight: 500;
@@ -632,7 +581,7 @@ button:disabled {
 .track-duration {
   color: #777;
   text-align: right;
-  font-size: 11px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 .tracklist-table tbody tr {
@@ -649,38 +598,31 @@ button:disabled {
   color: #0ff;
 }
 
-/* Bottom section: Music Player */
-.albums-bottom-section {
-  min-height: 100px;
-  max-height: 140px;
-}
-
 /* Audio Player Box */
 .audio-player-box {
-  background: #222;
+  background: #1a1a1a;
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 16px;
+  margin: 16px;
   border: 1px solid #333;
   box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-  height: 100%;
-  display: flex;
-  flex-direction: column;
+  flex-shrink: 0;
 }
 .audio-player-box h3 {
-  margin: 0 0 6px 0;
-  font-size: 12px;
+  margin: 0 0 12px 0;
+  font-size: 14px;
   color: #0ff;
   font-weight: 600;
 }
 .now-playing-info {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 .now-playing-cover {
-  width: 45px;
-  height: 45px;
+  width: 60px;
+  height: 60px;
   border-radius: 4px;
   overflow: hidden;
   border: 1px solid #444;
@@ -697,7 +639,7 @@ button:disabled {
   min-width: 0;
 }
 .now-playing-track {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   color: #fff;
   white-space: nowrap;
@@ -706,14 +648,14 @@ button:disabled {
   margin-bottom: 2px;
 }
 .now-playing-artist {
-  font-size: 11px;
+  font-size: 12px;
   color: #0ff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .now-playing-album {
-  font-size: 10px;
+  font-size: 11px;
   color: #888;
   white-space: nowrap;
   overflow: hidden;
@@ -782,7 +724,8 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  height: calc(100vh - 85px);
+  height: calc(100vh - 60px);
+  padding: 0;
 }
 
 .watcher-stats-section {
@@ -802,7 +745,7 @@ button:disabled {
 
 .watcher-stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
 }
 
@@ -1006,36 +949,21 @@ button:disabled {
 
 <!-- ==================== ALBUMS PAGE ==================== -->
 <div class="page" id="page-albums">
-  <div class="albums-top-section">
-    <div class="albums-search-container">
-      <input id="albums-search" type="text" placeholder="Search albums or artists…" />
-    </div>
-    <div class="albums-info-placeholder">
-      <div id="albums-current-info" class="albums-current-album-info"></div>
-    </div>
+  <div class="albums-page-header">
+    <input id="albums-search" type="text" placeholder="Search albums or artists…" />
   </div>
-  
-  <div class="albums-middle-section">
+  <div class="albums-page-layout">
+    <!-- Left sidebar -->
     <div class="albums-sidebar">
       <h2>Recent Albums</h2>
       <div class="albums-sidebar-list" id="albums-sidebar-list"></div>
     </div>
-    
+    <!-- Right detail panel -->
     <div class="albums-detail-panel" id="albums-detail-panel">
       <div class="albums-detail-empty">
         <div class="empty-icon">??</div>
         <div>Select an album to view its tracks</div>
       </div>
-    </div>
-  </div>
-  
-  <div class="albums-bottom-section">
-    <div class="audio-player-box" id="audio-player-box">
-      <h3>Now Playing</h3>
-      <div class="now-playing-info" id="now-playing-info">
-        <div class="audio-player-empty">Click a track to start playing</div>
-      </div>
-      <audio id="audio-player" controls></audio>
     </div>
   </div>
 </div>
@@ -1060,11 +988,6 @@ button:disabled {
           <span class="watcher-stat-value" id="cover-queue-count">0</span>
           <span class="watcher-stat-label">Cover Queue</span>
           <span class="watcher-stat-description">Cover art downloads</span>
-        </div>
-        <div class="watcher-stat-card">
-          <span class="watcher-stat-value" id="lyrics-queue-count">0</span>
-          <span class="watcher-stat-label">Lyrics Queue</span>
-          <span class="watcher-stat-description">Lyrics fetching (rate-limited)</span>
         </div>
       </div>
     </div>
@@ -1213,7 +1136,6 @@ async function updateWatcherStatus() {
     document.getElementById('inbox-queue-count').textContent = data.inbox_queue || 0;
     document.getElementById('library-queue-count').textContent = data.library_queue || 0;
     document.getElementById('cover-queue-count').textContent = data.cover_queue || 0;
-    document.getElementById('lyrics-queue-count').textContent = data.lyrics_queue || 0;
     
     // Add new log entries
     if (data.recent_logs && Array.isArray(data.recent_logs)) {
@@ -1304,36 +1226,10 @@ const pages = {
 tabs.forEach(tab => {
   tab.addEventListener("click", () => {
     if (tab.id === 'debug-toggle') return;
-    
-    const pageName = tab.dataset.page;
-    if (!pageName) {
-      console.error('Tab missing data-page attribute:', tab);
-      return;
-    }
-    
-    if (!pages[pageName]) {
-      console.error('Page not found for:', pageName);
-      debugLog(`Page not found: ${pageName}`, 'error');
-      return;
-    }
-    
-    // Remove active class from all tabs
-    tabs.forEach(t => {
-      if (t.id !== 'debug-toggle') {
-        t.classList.remove("active");
-      }
-    });
-    
-    // Remove active class from all pages
-    Object.values(pages).forEach(p => {
-      if (p) p.classList.remove("active");
-    });
-    
-    // Add active class to clicked tab and corresponding page
+    tabs.forEach(t => t.classList.remove("active"));
+    Object.values(pages).forEach(p => p.classList.remove("active"));
     tab.classList.add("active");
-    pages[pageName].classList.add("active");
-    
-    debugLog(`Switched to page: ${pageName}`);
+    pages[tab.dataset.page].classList.add("active");
   });
 });
 
@@ -1626,7 +1522,6 @@ function selectAlbum(idx) {
 
 function renderAlbumDetail(album) {
   const panel = document.getElementById("albums-detail-panel");
-  const infoSection = document.getElementById("albums-current-info");
   
   if (!album) {
     panel.innerHTML = "";
@@ -1634,12 +1529,6 @@ function renderAlbumDetail(album) {
     empty.className = "albums-detail-empty";
     empty.innerHTML = '<div class="empty-icon">??</div><div>Select an album to view its tracks</div>';
     panel.appendChild(empty);
-    
-    // Clear top info
-    if (infoSection) {
-      infoSection.innerHTML = "";
-      infoSection.className = "albums-current-album-info empty";
-    }
     return;
   }
 
@@ -1651,47 +1540,25 @@ function renderAlbumDetail(album) {
   let totalSeconds = 0;
   tracks.forEach(t => { totalSeconds += (t.length || 0); });
 
-  // Update top info section
-  if (infoSection) {
-    infoSection.innerHTML = "";
-    infoSection.className = "albums-current-album-info";
-    
-    const coverDiv = document.createElement("div");
-    coverDiv.className = "albums-current-album-cover";
-    const coverImg = document.createElement("img");
-    coverImg.src = coverUrlFor(album);
-    coverImg.onerror = () => { coverImg.onerror = null; coverImg.src = "/static/placeholder.jpg"; };
-    coverDiv.appendChild(coverImg);
-    
-    const textDiv = document.createElement("div");
-    textDiv.className = "albums-current-album-text";
-    
-    const titleEl = document.createElement("div");
-    titleEl.className = "albums-current-album-title";
-    titleEl.textContent = album.album || "(Unknown album)";
-    
-    const artistEl = document.createElement("div");
-    artistEl.className = "albums-current-album-artist";
-    artistEl.textContent = album.albumartist || album.artist || "";
-    
-    const metaParts = [];
-    if (album.year) metaParts.push(album.year);
-    if (tracks.length) metaParts.push(tracks.length + " tracks");
-    if (totalSeconds > 0) metaParts.push(formatCompactTime(totalSeconds + " seconds"));
-    
-    const metaEl = document.createElement("div");
-    metaEl.className = "albums-current-album-meta";
-    metaEl.textContent = metaParts.join(" • ");
-    
-    textDiv.appendChild(titleEl);
-    textDiv.appendChild(artistEl);
-    textDiv.appendChild(metaEl);
-    
-    infoSection.appendChild(coverDiv);
-    infoSection.appendChild(textDiv);
-  }
-
   panel.innerHTML = "";
+
+  const header = document.createElement("div"); header.className = "albums-detail-header";
+  const coverWrap = document.createElement("div"); coverWrap.className = "albums-detail-cover";
+  const coverImg = document.createElement("img"); coverImg.src = coverUrlFor(album);
+  coverImg.onerror = () => { coverImg.onerror = null; coverImg.src = "/static/placeholder.jpg"; };
+  coverWrap.appendChild(coverImg);
+
+  const info = document.createElement("div"); info.className = "albums-detail-info";
+  const titleEl = document.createElement("div"); titleEl.className = "albums-detail-title"; titleEl.textContent = album.album || "(Unknown album)";
+  const artistEl = document.createElement("div"); artistEl.className = "albums-detail-artist"; artistEl.textContent = album.albumartist || album.artist || "";
+  const metaParts = [];
+  if (album.year) metaParts.push(album.year);
+  if (tracks.length) metaParts.push(tracks.length + " tracks");
+  if (totalSeconds > 0) metaParts.push(formatCompactTime(totalSeconds + " seconds"));
+  const metaEl = document.createElement("div"); metaEl.className = "albums-detail-meta"; metaEl.textContent = metaParts.join(" • ");
+  info.appendChild(titleEl); info.appendChild(artistEl); info.appendChild(metaEl);
+  header.appendChild(coverWrap); header.appendChild(info);
+  panel.appendChild(header);
 
   const trackContainer = document.createElement("div"); trackContainer.className = "tracklist-container";
 
@@ -1728,10 +1595,28 @@ function renderAlbumDetail(album) {
   }
   panel.appendChild(trackContainer);
 
-  // Initialize player if not already done
-  if (!player) {
-    initializePlayer();
-  }
+  const playerBox = document.createElement("div");
+  playerBox.className = "audio-player-box";
+  playerBox.id = "audio-player-box";
+  
+  const playerTitle = document.createElement("h3");
+  playerTitle.textContent = "Now Playing";
+  playerBox.appendChild(playerTitle);
+
+  const nowPlayingInfo = document.createElement("div");
+  nowPlayingInfo.className = "now-playing-info";
+  nowPlayingInfo.id = "now-playing-info";
+  nowPlayingInfo.innerHTML = '<div class="audio-player-empty">Click a track to start playing</div>';
+  playerBox.appendChild(nowPlayingInfo);
+
+  const audioEl = document.createElement("audio");
+  audioEl.id = "audio-player";
+  audioEl.controls = true;
+  playerBox.appendChild(audioEl);
+
+  panel.appendChild(playerBox);
+
+  initializePlayer();
   
   currentAlbumData = album;
   currentPlaylist = tracks;

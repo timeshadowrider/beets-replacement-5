@@ -97,6 +97,44 @@ inbox_observer = None
 lib_observer = None
 cover_observer = None
 
+# Watcher logs
+watcher_logs = []
+watcher_logs_lock = threading.Lock()
+MAX_WATCHER_LOGS = 100
+last_log_id = 0
+
+# ---------------------------------------------------------------------------
+# WATCHER LOG UTILITIES
+# ---------------------------------------------------------------------------
+
+def add_watcher_log(level, message):
+    """Add a log entry to the watcher logs"""
+    global last_log_id
+    with watcher_logs_lock:
+        last_log_id += 1
+        entry = {
+            "id": last_log_id,
+            "timestamp": datetime.now().isoformat(),
+            "level": level,
+            "message": message
+        }
+        watcher_logs.insert(0, entry)
+        
+        # Keep only the most recent logs
+        if len(watcher_logs) > MAX_WATCHER_LOGS:
+            watcher_logs.pop()
+        
+        logger.info(f"[{level.upper()}] {message}")
+
+def get_recent_logs(since_id=None, limit=50):
+    """Get recent logs, optionally since a specific ID"""
+    with watcher_logs_lock:
+        if since_id is None:
+            return watcher_logs[:limit]
+        else:
+            # Return only logs with ID greater than since_id
+            return [log for log in watcher_logs if log["id"] > since_id][:limit]
+
 # ---------------------------------------------------------------------------
 # UTILITIES
 # ---------------------------------------------------------------------------
@@ -118,11 +156,9 @@ def invalidate_inbox_cache(*_a, **_k):
     """Invalidate the inbox cache - but with rate limiting to prevent spam"""
     global inbox_stats_cache, inbox_stats_cache_time
     with inbox_stats_lock:
-        # Only log occasionally to prevent log spam
         if inbox_stats_cache is not None:
             inbox_stats_cache = None
             inbox_stats_cache_time = None
-            # Don't log every invalidation - it's too noisy
 
 # ---------------------------------------------------------------------------
 # INBOX CLEANUP (delete dirs with NO audio files)
@@ -140,22 +176,20 @@ def cleanup_inbox_empty_dirs():
                     return True
             return False
         except Exception:
-            return True  # If we can't check, assume it has files (be safe)
+            return True
     
     def remove_empty_dirs(directory):
         """Remove directory and all empty subdirectories"""
         if not directory.exists() or not directory.is_dir():
             return
         
-        # First, recursively remove empty subdirectories
         for subdir in list(directory.iterdir()):
             if subdir.is_dir():
                 remove_empty_dirs(subdir)
         
-        # Then try to remove this directory if it's now empty
         try:
-            if not any(directory.iterdir()):  # Check if empty
-                logger.info(f"[CLEANUP] Removing empty dir: {directory}")
+            if not any(directory.iterdir()):
+                add_watcher_log("info", f"Removing empty dir: {directory.name}")
                 directory.rmdir()
         except Exception as e:
             logger.debug(f"[CLEANUP] Could not remove {directory}: {e}")
@@ -163,25 +197,21 @@ def cleanup_inbox_empty_dirs():
     if not INBOX_PATH.exists():
         return
     
-    # Process all top-level directories
     for item in INBOX_PATH.iterdir():
         if not item.is_dir() or item.name.startswith("."):
             continue
         
-        # Skip directories with "unpack" in the name
         if "unpack" in item.name.lower():
             continue
         
-        # If directory has no audio files anywhere, remove it completely
         if not has_audio_files(item):
             try:
-                logger.info(f"[CLEANUP] Removing directory tree with no audio: {item}")
+                add_watcher_log("warning", f"Removing directory tree with no audio: {item.name}")
                 import shutil
                 shutil.rmtree(item)
             except Exception as e:
                 logger.error(f"[CLEANUP] Failed to remove {item}: {e}")
         else:
-            # Directory has audio files, just clean up empty subdirectories
             remove_empty_dirs(item)
 
 def inbox_cleanup_scheduler():
@@ -190,7 +220,7 @@ def inbox_cleanup_scheduler():
             cleanup_inbox_empty_dirs()
         except Exception:
             logger.exception("Inbox cleanup scheduler error")
-        time.sleep(1800)  # 30 minutes
+        time.sleep(1800)
 
 # ---------------------------------------------------------------------------
 # STATIC FILE ROUTES
@@ -287,9 +317,12 @@ def stats():
 
 @app.post("/api/library/refresh")
 def refresh_library():
+    add_watcher_log("info", "Manual library refresh triggered")
     ok, out = run_cmd_list(["python3", REGEN_SCRIPT], timeout=120)
     if not ok:
+        add_watcher_log("error", f"Library refresh failed: {out[:100]}")
         raise HTTPException(status_code=500, detail=out)
+    add_watcher_log("success", "Library refresh completed")
     return {"status": "ok", "detail": out.strip()}
 
 @app.post("/api/library/import")
@@ -297,8 +330,9 @@ def import_library(background_tasks: BackgroundTasks):
     args = ["beet", "-c", BEETS_CONFIG, "import", "-A", str(INBOX_PATH)]
 
     def run():
-        logger.info("Manual import started")
+        add_watcher_log("info", "Manual import started")
         subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=IMPORT_TIMEOUT)
+        add_watcher_log("success", "Manual import completed")
 
     background_tasks.add_task(run)
     return {"status": "started", "cmd": args}
@@ -320,7 +354,21 @@ def recent(limit: int = 12):
         return []
 
 # ---------------------------------------------------------------------------
-# INBOX API - FIXED: Removed duplicate function name
+# WATCHER STATUS API
+# ---------------------------------------------------------------------------
+
+@app.get("/api/watcher/status")
+def watcher_status(since_id: int = None):
+    """Get current watcher status and recent logs"""
+    return {
+        "inbox_queue": inbox_q.qsize(),
+        "library_queue": lib_q.qsize(),
+        "cover_queue": cover_q.qsize(),
+        "recent_logs": get_recent_logs(since_id=since_id)
+    }
+
+# ---------------------------------------------------------------------------
+# INBOX API
 # ---------------------------------------------------------------------------
 
 @app.get("/api/inbox")
@@ -357,30 +405,25 @@ def compute_inbox_stats_fast():
         }
 
     try:
-        # Use shell commands for speed - much faster than Python file I/O
         import subprocess
         
-        # Count audio files (this is FAST even with 50k files)
         count_cmd = f'find "{INBOX_PATH}" -type f \\( -iname "*.mp3" -o -iname "*.flac" -o -iname "*.m4a" -o -iname "*.ogg" -o -iname "*.wav" -o -iname "*.aac" \\) | wc -l'
         result = subprocess.run(count_cmd, shell=True, capture_output=True, text=True, timeout=10)
         tracks = int(result.stdout.strip()) if result.returncode == 0 else 0
         
-        # Get total size (du is fast)
         size_cmd = f'du -sb "{INBOX_PATH}" 2>/dev/null | cut -f1'
         result = subprocess.run(size_cmd, shell=True, capture_output=True, text=True, timeout=10)
         total_bytes = int(result.stdout.strip()) if result.returncode == 0 else 0
         
-        # Count top-level directories (excluding _UNPACK_ and hidden)
         dir_cmd = f'find "{INBOX_PATH}" -maxdepth 1 -type d ! -name ".*" ! -name "*_UNPACK_*" ! -path "{INBOX_PATH}" | wc -l'
         result = subprocess.run(dir_cmd, shell=True, capture_output=True, text=True, timeout=5)
         num_dirs = int(result.stdout.strip()) if result.returncode == 0 else 0
         
-        # For artists/albums, just sample the first level dirs
         artists = set()
         albums = set()
         
         try:
-            for item in list(INBOX_PATH.iterdir())[:200]:  # Sample first 200
+            for item in list(INBOX_PATH.iterdir())[:200]:
                 if not item.is_dir() or item.name.startswith(".") or "_UNPACK_" in item.name:
                     continue
                     
@@ -391,7 +434,6 @@ def compute_inbox_stats_fast():
             artists.add("Unknown")
             albums.add("Unknown")
         
-        # Estimate time (3 minutes per track average)
         estimated_minutes = tracks * 3
         time_str = humanize.precisedelta(estimated_minutes * 60) if estimated_minutes > 0 else "0 seconds"
 
@@ -501,7 +543,6 @@ class DebouncedHandler(FileSystemEventHandler):
                 except ValueError:
                     return
 
-            # Check if any part of the path contains an ignored prefix
             if self.ignore_dirs:
                 path_parts = Path(target).parts
                 for part in path_parts:
@@ -522,7 +563,7 @@ class DebouncedHandler(FileSystemEventHandler):
                     return
                 self.queued.add(target)
 
-            logger.info("%s enqueue: %s", self.label, target)
+            add_watcher_log("info", f"{self.label}: {os.path.basename(target)}")
             self.queue.put(target)
 
         except Exception:
@@ -534,6 +575,7 @@ class DebouncedHandler(FileSystemEventHandler):
 
 def inbox_worker():
     logger.info("Inbox worker started")
+    add_watcher_log("info", "Inbox worker started")
     while not stop_event.is_set():
         try:
             target = inbox_q.get(timeout=1)
@@ -550,14 +592,14 @@ def inbox_worker():
                 continue
 
             args = ["beet", "-c", BEETS_CONFIG, "import", "-A", target]
-            logger.info("Importing inbox: %s", target)
+            add_watcher_log("info", f"Importing: {os.path.basename(target)}")
             subprocess.run(args, timeout=IMPORT_TIMEOUT)
 
-            # Invalidate cache AFTER successful import
             invalidate_inbox_cache()
-            logger.info("Inbox import completed, cache invalidated")
+            add_watcher_log("success", f"Import complete: {os.path.basename(target)}")
 
-        except Exception:
+        except Exception as e:
+            add_watcher_log("error", f"Import failed for {os.path.basename(target)}: {str(e)[:50]}")
             logger.exception("Inbox import failed for %s", target)
         finally:
             inbox_q.task_done()
@@ -566,6 +608,7 @@ def inbox_worker():
 
 def library_worker():
     logger.info("Library worker started")
+    add_watcher_log("info", "Library worker started")
     while not stop_event.is_set():
         try:
             target = lib_q.get(timeout=1)
@@ -580,14 +623,12 @@ def library_worker():
 
             success = False
 
-            # First attempt: exact target
             ok, _ = run_cmd_list(
                 ["python3", REGEN_SCRIPT, target],
                 timeout=REGEN_TIMEOUT
             )
             success = success or ok
 
-            # Second attempt: strip [n] suffix
             if not success:
                 t2 = re.sub(r"\s*\[\d+\]$", "", target)
                 if t2 != target and os.path.exists(t2):
@@ -597,7 +638,6 @@ def library_worker():
                     )
                     success = success or ok
 
-            # Final fallback: full regen
             if not success:
                 ok, _ = run_cmd_list(
                     ["python3", REGEN_SCRIPT],
@@ -606,12 +646,16 @@ def library_worker():
                 success = success or ok
 
             if success:
+                add_watcher_log("success", f"Library updated: {os.path.basename(target)}")
                 run_cmd_list(
                     ["python3", "/app/scripts/recompute_recent.py"],
                     timeout=120
                 )
+            else:
+                add_watcher_log("warning", f"Library update incomplete: {os.path.basename(target)}")
 
-        except Exception:
+        except Exception as e:
+            add_watcher_log("error", f"Library update failed: {str(e)[:50]}")
             logger.exception("Library processing failed for %s", target)
         finally:
             lib_q.task_done()
@@ -620,6 +664,7 @@ def library_worker():
 
 def cover_worker():
     logger.info("Cover worker started")
+    add_watcher_log("info", "Cover worker started")
     while not stop_event.is_set():
         try:
             target = cover_q.get(timeout=1)
@@ -636,13 +681,14 @@ def cover_worker():
             if not album_dir.exists() or cover.exists():
                 continue
 
-            logger.info("Fetching cover for %s", album_dir)
+            add_watcher_log("info", f"Fetching cover: {album_dir.name}")
             ok, _ = run_cmd_list(
                 ["python3", "/app/scripts/fetch_cover.py", str(album_dir)],
                 timeout=300,
             )
 
             if ok:
+                add_watcher_log("success", f"Cover fetched: {album_dir.name}")
                 run_cmd_list(
                     ["python3", REGEN_SCRIPT, str(album_dir)],
                     timeout=REGEN_TIMEOUT
@@ -651,8 +697,11 @@ def cover_worker():
                     ["python3", "/app/scripts/recompute_recent.py"],
                     timeout=120
                 )
+            else:
+                add_watcher_log("warning", f"Cover fetch failed: {album_dir.name}")
 
-        except Exception:
+        except Exception as e:
+            add_watcher_log("error", f"Cover fetch error: {str(e)[:50]}")
             logger.exception("Cover fetch failed for %s", target)
         finally:
             cover_q.task_done()
@@ -669,6 +718,7 @@ def startup():
     global inbox_observer, lib_observer, cover_observer
 
     stop_event.clear()
+    add_watcher_log("info", "Application starting up")
 
     # Start workers
     inbox_thread = threading.Thread(target=inbox_worker, daemon=True)
@@ -727,10 +777,12 @@ def startup():
     lib_observer.start()
     cover_observer.start()
 
+    add_watcher_log("success", "All workers and watchers started")
     logger.info("Startup complete: workers + watchers + cleanup scheduler running.")
 
 @app.on_event("shutdown")
 def shutdown():
+    add_watcher_log("warning", "Application shutting down")
     stop_event.set()
 
     for obs in (inbox_observer, lib_observer, cover_observer):

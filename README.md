@@ -1,223 +1,257 @@
-# **Beets Replacement 5 ‚Äî Fingerprint‚ÄëDriven Music Library Management**
+# Beets Replacement 5 ó Deterministic, Fingerprint-Driven Music Library Management
 
-A modern, deterministic, fingerprint‚Äëaware replacement for the Beets Web API ‚Äî built for large libraries, reproducible automation, and complete auditability.
+A modern, reproducible, fingerprint-aware replacement for the Beets Web API ó designed for large libraries, home-lab reliability, and complete auditability.  
+This project wraps Beets inside a FastAPI backend, adds a structured JSON frontend layer, and introduces watchers for imports, covers, lyrics, and library changes.
 
-This project wraps Beets inside a FastAPI backend, adds a structured JSON frontend layer, and introduces a set of tools for deduplication, metadata enrichment, and library cleanup. It is designed for home‚Äëlab environments where reliability, transparency, and repeatability matter more than ‚Äúmagic‚Äù.
+Built for environments where determinism, safety, and transparency matter more than ìmagic.î
 
----
+## Features
 
-## **Features**
+### Music Management
+- Automatic import system watching /music/inbox
+- Real-time library updates with incremental regeneration
+- Smart cover art fetching (background watcher)
+- Lyrics Watcher (minimal): queues missing lyrics from Genius and updates metadata
+- Full metadata display including bitrate, format, duration, fingerprints
 
-### **üéµ Fingerprint‚ÄëBased Duplicate Detection**
-- Uses the Beets **chroma** plugin to generate AcoustID fingerprints.
-- Stores fingerprints in the `acoustid_fingerprint` column for deterministic matching.
-- Detects duplicates across:
-  - multiple editions  
-  - re‚Äërips  
-  - compilations  
-  - multi‚Äëdisc sets  
-- Supports full‚Äëlibrary dedupe sweeps using:
-  ```
-  beet duplicates -f -t -d
-  ```
+### Modern Web Interface
+- Three-tab layout: Dashboard, Albums, Watcher Activity
+- Built-in audio player (Plyr.js)
+- Responsive neon-themed dark UI
+- Real-time search across albums and artists
+- Album grid view with cover art
 
-### **üì¶ Dockerized Beets Environment**
-- Fully containerized Beets instance.
-- Persistent config and database.
-- Safe schema migrations (including fingerprint column fixes).
-- Supports large libraries without blocking or corruption.
+### Monitoring & Debugging
+- Watcher activity dashboard
+- Live logs with color-coded entries
+- Debug console (Ctrl+D / Cmd+D)
+- Cached inbox statistics
 
-### **‚ö° FastAPI ‚ÄúBeets Replacement API‚Äù**
-A custom backend that:
-- Exposes structured JSON endpoints.
-- Replaces the legacy Beets Web plugin.
-- Generates `albums.json`, `recent.json`, and other frontend‚Äëready metadata.
-- Integrates with your media dashboard UI.
+### Performance
+- Incremental regeneration
+- Cached stats
+- Debounced watchers
+- Efficient JSON storage
 
-### **üñºÔ∏è Automatic Cover Art Fetching**
-- Background watcher fetches `cover.jpg` for every album.
-- Ensures visual completeness across the entire library.
-- Runs safely in a background thread without blocking imports.
+## Fingerprint-Driven Duplicate Detection
 
-### **üßπ Automated Cleanup Routines**
-- Interval‚Äëbased cleanup of inbox/import directories.
-- Deletes only folders with **no audio files** and **no UNPACK markers**.
-- Never blocks imports or watchers.
-- Fully audit‚Äëfriendly and idempotent.
+### Fingerprint Matching
+- Uses Beets chroma plugin
+- Stores fingerprints in acoustid_fingerprint
+- Detects:
+  - re-rips
+  - alternate masters
+  - streaming replacements
+  - compilations
+  - multi-disc overlaps
 
-### **üõ†Ô∏è Deterministic Import Pipeline**
-- Predefined import flags for silent, non‚Äëinteractive imports.
-- Automatic fingerprinting.
-- Automatic metadata enrichment (genre, lyrics, MB data).
-- Edition‚Äëaware path handling.
-
-### **üìä Frontend Integration**
-- Generates canonical `albums.json` for your UI.
-- Ensures consistent album ordering, cover art presence, and metadata completeness.
-- Rebuilds instantly after dedupe or import.
-
----
-
-## **Architecture Overview**
-
-```
-+------------------------+
-|   Inbox / Downloads    |
-+-----------+------------+
-            |
-            v
-+------------------------+
-|   Beets (Docker)       |
-|  - chroma              |
-|  - fetchart            |
-|  - duplicates          |
-|  - metadata plugins    |
-+-----------+------------+
-            |
-            v
-+------------------------+
-|  Beets Replacement API |
-|   (FastAPI backend)    |
-+-----------+------------+
-            |
-            v
-+------------------------+
-|   Frontend JSON Layer  |
-|  albums.json, recent   |
-+------------------------+
-```
-
-Everything is modular, reproducible, and validated at each step.
-
----
-
-## **Setup**
-
-### **1. Clone the repository**
-```
-git clone https://github.com/<yourname>/beets-replacement-5
-cd beets-replacement-5
-```
-
-### **2. Configure Beets**
-Your config includes:
-- chroma  
-- fetchart  
-- embedart  
-- lastgenre  
-- lyrics  
-- duplicates  
-- convert  
-- mbsync  
-- smartplaylist  
-- and more  
-
-### **3. Start the Docker stack**
-```
-docker compose up -d
-```
-
-### **4. Verify Beets is working**
-```
-docker exec -it beets-single-5 beet version
-docker exec -it beets-single-5 beet config -p
-```
-
----
-
-## **Fingerprinting**
-
-To fingerprint the entire library:
-
-```
-docker exec -it beets-single-5 beet -c /config/config.yaml fingerprint
-```
-
-To verify fingerprints:
-
-```
-beet ls -f '$path $acoustid_fingerprint'
-```
-
----
-
-## **Duplicate Removal**
+### Dedupe Commands
 
 Preview duplicates:
-
-```
 docker exec -it beets-single-5 beet -c /config/config.yaml duplicates -f -t
-```
 
-Delete duplicates and their files:
-
-```
+Delete duplicates:
 docker exec -it beets-single-5 beet -c /config/config.yaml duplicates -f -t -d
-```
 
----
+Fingerprint entire library:
+docker exec -it beets-single-5 beet -c /config/config.yaml fingerprint
 
-## **Frontend Metadata Generation**
+## Architecture Overview
 
-Regenerate `albums.json`:
+Inbox ? Beets Import ? Library  
+           ?  
+   Fingerprinting + Metadata  
+           ?  
+   Beets Replacement API (FastAPI)  
+           ?  
+   JSON Layer (albums.json, recent.json)  
+           ?  
+   Web Interface (index.html)
 
-```
-docker exec -it beets-single-5 python3 /app/scripts/regenerate_albums.py
-```
+Everything is modular, deterministic, and validated at each step.
 
----
+## Installation
 
-## **Inbox Cleanup**
+### 1. Clone the repository
+git clone https://github.com/yourusername/beets-replacement-5
+cd beets-replacement-5
 
-Delete folders with **no audio files**:
+### 2. Create directory structure
+mkdir -p config data static scripts backend
 
-```
-find "/path/to/inbox" -mindepth 1 -type d \
-  -print0 | while IFS= read -r -d '' dir; do
-    if ! find "$dir" -maxdepth 1 -type f \( \
-        -iname "*.mp3" -o -iname "*.flac" -o -iname "*.m4a" -o \
-        -iname "*.wav" -o -iname "*.ogg" -o -iname "*.aac" \
-      \) | grep -q .; then
-        rm -rf "$dir"
-    fi
-done
-```
+### 3. Configure Beets
+Place your config.yaml in ./config:
 
----
+directory: /music/library
+library: /data/beets-library.blb
 
-## **Philosophy**
+import:
+  move: yes
+  copy: no
+  write: yes
+  resume: ask
+  incremental: yes
+  quiet_fallback: skip
 
-This project is built around:
+plugins: chroma fetchart embedart duplicates smartplaylist
 
-- **Determinism**  
-  Every action is explicit, logged, and reproducible.
+fetchart:
+  auto: yes
 
-- **Auditability**  
-  No silent mutations. Every change can be validated.
+embedart:
+  auto: yes
 
-- **Safety**  
-  No destructive operations without fingerprint‚Äëbased certainty.
+### 4. Docker Compose
 
-- **Completeness**  
-  Every album has cover art, metadata, and a canonical representation.
+version: '3.8'
 
-- **Home‚Äëlab reliability**  
-  Designed to survive rebuilds, upgrades, and lifecycle events.
+services:
+  beets-replacement:
+    build: .
+    ports:
+      - "7080:7080"
+    volumes:
+      - ./config:/config
+      - ./data:/data
+      - ./backend:/app/backend
+      - ./scripts:/app/scripts
+      - ./static:/app/static
+      - /path/to/music:/music/library
+      - /path/to/inbox:/music/inbox
+    environment:
+      - TZ=America/Los_Angeles
+    restart: unless-stopped
 
----
+### 5. Dockerfile (matches your real environment)
 
-## **Roadmap**
+FROM python:3.11-slim
 
-- Full album‚Äëlevel fingerprint grouping  
-- Web UI for dedupe review  
-- Real‚Äëtime import dashboard  
-- Playlist generation engine  
-- Multi‚Äëlibrary support  
+ENV PYTHONUNBUFFERED=1 \
+    BEETS_CONFIG=/config/config.yaml \
+    BEETS_LIBRARY=/data/beets-library.blb \
+    APP_PORT=7080 \
+    APP_USER=appuser
 
----
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg libmagic1 sqlite3 curl git libchromaprint-tools \
+    libjpeg-dev zlib1g-dev libpng-dev imagemagick build-essential \
+    procps coreutils findutils grep sed gawk flac \
+  && rm -rf /var/lib/apt/lists/*
 
-## **License**
+WORKDIR /app
 
-This project is licensed under the **MIT License**, the same license used by the original Beets project.
+COPY backend/requirements.txt /app/backend/requirements.txt
 
-A full copy of the MIT License is included in the `LICENSE` file.
+RUN pip install --no-cache-dir -r /app/backend/requirements.txt \
+ && pip install --no-cache-dir requests pylast pyacoustid langdetect beautifulsoup4 Pillow Wand
+
+RUN apt-get purge -y --auto-remove build-essential \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN useradd -m -u 1000 ${APP_USER} \
+ && mkdir -p /app/data /config /music /app/static \
+ && chown -R ${APP_USER}:${APP_USER} /app /app/data /config /music /app/static
+
+COPY backend /app/backend
+COPY config /config
+COPY scripts /app/scripts
+COPY entrypoint.sh /app/entrypoint.sh
+
+RUN chmod +x /app/scripts/*.sh /app/entrypoint.sh \
+ && chown -R ${APP_USER}:${APP_USER} /app/backend /app/scripts /app/entrypoint.sh
+
+EXPOSE ${APP_PORT}
+
+USER ${APP_USER}
+
+RUN mkdir -p /home/${APP_USER}/.config/beets && \
+    rm -f /home/${APP_USER}/.config/beets/config.yaml && \
+    ln -s /config/config.yaml /home/${APP_USER}/.config/beets/config.yaml
+
+CMD ["/app/entrypoint.sh"]
+
+### 6. Launch
+docker compose up -d
+
+### 7. Access the UI
+http://localhost:7080
+
+## Project Structure
+
+beets-replacement-5/
++-- backend/
+¶   +-- app.py
+¶   +-- requirements.txt
+¶   +-- ...
++-- static/
+¶   +-- index.html
++-- scripts/
+¶   +-- regenerate_albums.py
+¶   +-- recompute_recent.py
+¶   +-- smart_regenerate.py
++-- config/
+¶   +-- config.yaml
++-- data/
+¶   +-- beets-library.blb
++-- entrypoint.sh
++-- Dockerfile
++-- README.md
+
+## API Endpoints
+
+### Library
+GET /api/stats  
+POST /api/library/refresh  
+POST /api/library/import  
+GET /api/albums  
+GET /api/albums/recent  
+
+### Inbox
+GET /api/inbox/stats  
+GET /api/inbox/tree  
+GET /api/inbox/folder  
+POST /api/inbox/stats/clear-cache  
+
+### Monitoring
+GET /api/watcher/status
+
+### Static
+/  
+/data/albums.json  
+/music/library/{path}
+
+## Automatic Import Workflow
+
+1. Watcher detects new files  
+2. Debounce to ensure complete copy  
+3. Beets imports  
+4. Fingerprinting + metadata  
+5. JSON regeneration  
+6. UI updates instantly  
+
+## Inbox Cleanup
+
+Deletes folders with no audio files and no UNPACK markers.
+
+## Philosophy
+
+- Deterministic ó every action is explicit and reproducible  
+- Audit-friendly ó no silent mutations  
+- Safety-first ó destructive actions require fingerprint certainty  
+- Complete ó every album has cover art, metadata, and canonical JSON  
+- Home-lab reliable ó survives rebuilds and lifecycle events  
+
+## Roadmap
+
+- Playlist management  
+- Multi-user support  
+- Analytics dashboard  
+- Mobile app  
+- Spotify/Last.fm integration  
+- Bulk editing  
+- Advanced search  
+- Export/backup tools  
+
+## License
+
+MIT License ó see LICENSE.

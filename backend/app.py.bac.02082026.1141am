@@ -50,31 +50,13 @@ REGEN_SCRIPT = "/app/scripts/regenerate_albums.py"
 BEETS_CONFIG = "/config/config.yaml"
 INDEX_HTML = "/app/static/index.html"
 
-INBOX_PATH = Path("/inbox")
+INBOX_PATH = Path("/music/inbox")
 LIBRARY_PATH = Path("/music/library")
 
-# Setup logging FIRST before using logger
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-logger = logging.getLogger("beets-replacement")
-
-# Volumio / MPD Configuration - Read from environment variables
-VOLUMIO_MUSIC_MOUNT = os.environ.get("VOLUMIO_MUSIC_MOUNT", "INTERNAL")
+# Volumio Configuration
+VOLUMIO_MUSIC_MOUNT = "INTERNAL"  # or "USB", "NAS", etc.
 VOLUMIO_PLAYLIST_DIR = Path("/data/playlist")
-
-# Volumio base URL (used only for logging / future use)
-VOLUMIO_URL = os.environ.get("VOLUMIO_URL", "http://volumio.local")
-
-# MPD connection details (Volumio's MPD)
-MPD_HOST = os.environ.get("MPD_HOST", "10.0.0.102")
-MPD_PORT = int(os.environ.get("MPD_PORT", "6600"))
-
-# Log Volumio configuration on startup
-logger.info("=== Volumio / MPD Configuration ===")
-logger.info(f"Volumio URL: {VOLUMIO_URL}")
-logger.info(f"Music Mount: {VOLUMIO_MUSIC_MOUNT}")
-logger.info(f"Local Playlist Dir: {VOLUMIO_PLAYLIST_DIR}")
-logger.info(f"MPD Host: {MPD_HOST}")
-logger.info(f"MPD Port: {MPD_PORT}")
+VOLUMIO_URL = "http://volumio.local:3000"  # Fixed URL
 
 INBOX_STATS_CACHE_SECONDS = 60
 DEBOUNCE_INBOX = 60.0
@@ -89,6 +71,9 @@ REGEN_TIMEOUT = 900
 LYRICS_RATE_LIMIT = 10
 LYRICS_RETRY_DELAY = 60
 LYRICS_MAX_RETRIES = 3
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logger = logging.getLogger("beets-replacement")
 
 # ---------------------------------------------------------------------------
 # GLOBAL STATE
@@ -196,33 +181,30 @@ def invalidate_inbox_cache(*_a, **_k):
             inbox_stats_cache = None
             inbox_stats_cache_time = None
 
-# ============================================================
-# MPD URI CONVERSION FOR VOLUMIO 4.x
-# ============================================================
+# ---------------------------------------------------------------------------
+# VOLUMIO PLAYLIST UTILITIES
+# ---------------------------------------------------------------------------
 
-def convert_path_to_mpd_uri(beets_path: str) -> str:
+def convert_path_to_volumio_uri(beets_path: str) -> str:
     """
-    Convert a Beets library path (/music/library/Artist/Album/Track.flac)
-    into an MPD path for Volumio 4.x:
-        NAS/MUSIC/Artist/Album/Track.flac
-
-    Also prevents double-prefixing if already converted.
+    Convert Beets library path to Volumio URI format
+    
+    Example:
+        /music/library/Pink Floyd/Dark Side/Time.flac
+        ? music-library/INTERNAL/Pink Floyd/Dark Side/Time.flac
     """
-    if not isinstance(beets_path, str):
-        return ""
-
-    # If already MPD format, return as-is
-    if beets_path.startswith("NAS/MUSIC/"):
-        return beets_path
-
-    # Strip the /music/library/ prefix
-    prefix = "/music/library/"
-    if beets_path.startswith(prefix):
-        relative = beets_path[len(prefix):]
+    # Remove /music/library prefix
+    if beets_path.startswith("/music/library/"):
+        relative_path = beets_path[len("/music/library/"):]
+    elif beets_path.startswith("music/library/"):
+        relative_path = beets_path[len("music/library/"):]
     else:
-        relative = beets_path.lstrip("/")
-
-    return f"NAS/MUSIC/{relative}"
+        relative_path = beets_path
+    
+    # Build Volumio URI
+    volumio_uri = f"music-library/{VOLUMIO_MUSIC_MOUNT}/{relative_path}"
+    
+    return volumio_uri
 
 # ---------------------------------------------------------------------------
 # LYRICS UTILITIES
@@ -390,7 +372,7 @@ def serve_albums_json():
 
 @app.post("/api/playlist/build")
 async def build_playlist(file: UploadFile = File(...)):
-    """Build a playlist from a CSV file using the external script."""
+    """Build a Volumio playlist from a CSV file"""
     
     # Save uploaded CSV to temp file
     temp_csv = tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.csv')
@@ -424,10 +406,10 @@ async def build_playlist(file: UploadFile = File(...)):
             playlist_data = json.loads(result.stdout)
             os.unlink(temp_csv.name)
             
-            # IMPORTANT: do NOT convert to MPD URIs here.
-            # Keep raw Beets paths (/music/library/...) and let /api/playlist/save
-            # handle the MPD mapping exactly once.
+            # Convert paths to Volumio URI format
             for track in playlist_data:
+                if 'uri' in track:
+                    track['uri'] = convert_path_to_volumio_uri(track['uri'])
                 track['type'] = 'track'
                 track['service'] = 'mpd'
             
@@ -456,108 +438,40 @@ async def save_playlist(
     playlist_name: str = Form(...),
     playlist_data: str = Form(...)
 ):
-    """
-    Save playlist locally (JSON backup) and push to Volumio via MPD.
-
-    Flow:
-      1. Save JSON to /data/playlist/<name>.json
-      2. Convert Beets paths ? MPD URIs (NAS/MUSIC/...)
-      3. Clear MPD queue
-      4. Add each track
-      5. Save playlist in Volumio (stored in /var/lib/mpd/playlists/*.m3u)
-    """
+    """Save playlist in Volumio JSON format"""
     try:
         playlist = json.loads(playlist_data)
-
-        # Ensure local playlist directory exists
+        
+        # Ensure playlist directory exists
         VOLUMIO_PLAYLIST_DIR.mkdir(exist_ok=True, parents=True)
-
-        # Local JSON backup
+        
+        # Create Volumio-compatible playlist file (.json, not .m3u!)
         playlist_file = VOLUMIO_PLAYLIST_DIR / f"{playlist_name}.json"
-
-        # Normalize tracks for Volumio 4.x MPD
+        
+        # Ensure all tracks have required Volumio fields
         for i, track in enumerate(playlist):
-            # Required Volumio metadata
-            track.setdefault("service", "mpd")
-            track.setdefault("type", "track")
-            track.setdefault("tracknumber", i + 1)
-
-            # Convert Beets path ? MPD URI (idempotent)
-            if "uri" in track:
-                track["uri"] = convert_path_to_mpd_uri(track["uri"])
-
-        # Save JSON backup
-        with open(playlist_file, "w", encoding="utf-8") as f:
+            if 'service' not in track:
+                track['service'] = 'mpd'
+            if 'type' not in track:
+                track['type'] = 'track'
+            if 'tracknumber' not in track:
+                track['tracknumber'] = i + 1
+        
+        # Save as JSON
+        with open(playlist_file, 'w', encoding='utf-8') as f:
             json.dump(playlist, f, indent=2)
-
-        add_watcher_log("success", f"Saved playlist locally: {playlist_name} ({len(playlist)} tracks)")
-
-        # ============================================================
-        # PUSH TO VOLUMIO VIA MPD
-        # ============================================================
-        volumio_success = False
-        volumio_message = ""
-
-        try:
-            base_cmd = ["mpc", "-h", MPD_HOST, "-p", str(MPD_PORT)]
-
-            # 1) Clear MPD queue
-            ok, out = run_cmd_list(base_cmd + ["clear"], timeout=10)
-            if not ok:
-                raise RuntimeError(f"MPD clear failed: {out[:200]}")
-
-            # 2) Add tracks
-            added = 0
-            for track in playlist:
-                uri = track.get("uri", "")
-                if not uri:
-                    continue
-
-                ok, out = run_cmd_list(base_cmd + ["add", uri], timeout=10)
-                if not ok:
-                    logger.warning(f"MPD add failed for {uri}: {out[:200]}")
-                    continue
-
-                added += 1
-
-            if added == 0:
-                raise RuntimeError("No tracks were added to MPD playlist")
-
-            # 3) Save playlist in MPD
-            ok, out = run_cmd_list(base_cmd + ["save", playlist_name], timeout=10)
-            if not ok:
-                raise RuntimeError(f"MPD save failed: {out[:200]}")
-
-            volumio_success = True
-            volumio_message = (
-                f"Playlist created in Volumio via MPD at {MPD_HOST}:{MPD_PORT} "
-                f"({added} tracks)"
-            )
-
-            add_watcher_log("success", f"Pushed playlist to Volumio via MPD: {playlist_name} ({added} tracks)")
-
-        except Exception as e:
-            volumio_message = f"MPD/Volumio playlist push failed: {str(e)}"
-            add_watcher_log("warning", f"MPD playlist error: {str(e)[:200]}")
-
-        # ============================================================
-        # RETURN RESPONSE
-        # ============================================================
+        
+        add_watcher_log("success", f"Saved Volumio playlist: {playlist_name} ({len(playlist)} tracks)")
+        
         return {
             "status": "success",
-            "message": f"Playlist saved: {playlist_name}",
+            "message": f"Playlist saved to {playlist_file}",
             "path": str(playlist_file),
             "tracks": len(playlist),
             "format": "Volumio JSON",
-            "volumio_pushed": volumio_success,
-            "volumio_message": volumio_message,
-            "note": (
-                f"Playlist saved locally and "
-                f"{'pushed to Volumio via MPD' if volumio_success else 'attempted MPD push to Volumio'} "
-                f"at {MPD_HOST}:{MPD_PORT}"
-            ),
+            "note": f"Playlist will appear in Volumio at {VOLUMIO_URL}"
         }
-
+        
     except Exception as e:
         add_watcher_log("error", f"Failed to save playlist: {str(e)[:100]}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -776,92 +690,6 @@ def get_inbox_stats():
         inbox_stats_cache_time = now
         return inbox_stats_cache
 
-@app.get("/api/inbox/tree")
-def get_inbox_tree():
-    """Get inbox directory structure as a tree"""
-    try:
-        if not INBOX_PATH.exists():
-            return {"folders": {}}
-        
-        tree = {}
-        
-        # Iterate through artist folders
-        for artist_dir in sorted(INBOX_PATH.iterdir()):
-            if not artist_dir.is_dir() or artist_dir.name.startswith(".") or "_UNPACK_" in artist_dir.name:
-                continue
-            
-            artist_name = artist_dir.name
-            tree[artist_name] = []
-            
-            # Get albums for this artist
-            for album_dir in sorted(artist_dir.iterdir()):
-                if not album_dir.is_dir() or album_dir.name.startswith("."):
-                    continue
-                
-                # Count audio files in this album
-                audio_files = list(album_dir.glob("*.flac")) + \
-                             list(album_dir.glob("*.mp3")) + \
-                             list(album_dir.glob("*.m4a")) + \
-                             list(album_dir.glob("*.ogg")) + \
-                             list(album_dir.glob("*.wav"))
-                
-                tree[artist_name].append({
-                    "name": album_dir.name,
-                    "tracks": len(audio_files)
-                })
-        
-        return {"folders": tree}
-        
-    except Exception as e:
-        logger.error(f"Error generating inbox tree: {e}")
-        return {"folders": {}, "error": str(e)}
-
-
-@app.get("/api/inbox/folder")
-def get_inbox_folder(artist: str, album: str):
-    """Get tracks in a specific inbox folder"""
-    try:
-        folder_path = INBOX_PATH / artist / album
-        
-        if not folder_path.exists() or not folder_path.is_dir():
-            raise HTTPException(status_code=404, detail="Folder not found")
-        
-        tracks = []
-        audio_extensions = [".flac", ".mp3", ".m4a", ".ogg", ".wav", ".aac"]
-        
-        for file_path in sorted(folder_path.iterdir()):
-            if file_path.is_file() and file_path.suffix.lower() in audio_extensions:
-                # Get basic file info
-                stat = file_path.stat()
-                
-                # Try to get audio metadata
-                try:
-                    audio = MutagenFile(str(file_path))
-                    duration = int(audio.info.length) if audio and hasattr(audio.info, 'length') else 0
-                except Exception:
-                    duration = 0
-                
-                tracks.append({
-                    "filename": file_path.name,
-                    "size": stat.st_size,
-                    "duration": duration,
-                    "path": str(file_path.relative_to(INBOX_PATH))
-                })
-        
-        return {
-            "artist": artist,
-            "album": album,
-            "tracks": tracks,
-            "track_count": len(tracks)
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error reading inbox folder: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 def compute_inbox_stats_fast():
     """Compute inbox stats using shell commands"""
     
@@ -908,199 +736,326 @@ def compute_inbox_stats_fast():
             "albums": len(albums),
             "album_artists": len(artists),
         }
+        
     except Exception as e:
         logger.error(f"Error computing inbox stats: {e}")
         return {
             "tracks": 0,
-            "total_time": "0 seconds",
+            "total_time": "error",
             "total_size": "0 B",
             "artists": 0,
             "albums": 0,
             "album_artists": 0,
         }
 
-# ---------------------------------------------------------------------------
-# FILE SYSTEM EVENT HANDLERS
-# ---------------------------------------------------------------------------
+@app.get("/api/inbox/tree")
+def inbox_tree():
+    if not INBOX_PATH.exists():
+        return {"folders": {}}
+    return {
+        "folders": {
+            d.name: [x.name for x in d.iterdir() if x.is_dir()]
+            for d in INBOX_PATH.iterdir()
+            if d.is_dir()
+        }
+    }
 
-class InboxHandler(FileSystemEventHandler):
-    """Watch inbox for new files and trigger import"""
-    def on_created(self, event):
-        if event.is_directory:
-            return
-        # Debounce - add to queue
-        with inbox_lock:
-            if str(INBOX_PATH) not in inbox_queued:
-                inbox_queued.add(str(INBOX_PATH))
-                inbox_q.put(time.time())
-                add_watcher_log("info", f"Inbox change detected: {Path(event.src_path).name}")
-
-class LibraryHandler(FileSystemEventHandler):
-    """Watch library for changes and trigger regeneration"""
-    def on_created(self, event):
-        if event.is_directory:
-            return
-        with lib_lock:
-            if str(LIBRARY_PATH) not in lib_queued:
-                lib_queued.add(str(LIBRARY_PATH))
-                lib_q.put(time.time())
-                add_watcher_log("info", f"Library change detected: {Path(event.src_path).name}")
+@app.get("/api/inbox/folder")
+def inbox_folder(artist: str, album: str):
+    folder = INBOX_PATH / artist / album
+    if not folder.exists() or not folder.is_dir():
+        return {"files": []}
+    return {"files": [f.name for f in folder.iterdir() if f.is_file()]}
 
 # ---------------------------------------------------------------------------
-# WORKER THREADS
+# FILE WATCHER HANDLER
+# ---------------------------------------------------------------------------
+
+class DebouncedHandler(FileSystemEventHandler):
+    def __init__(self, queue, lock, queued, debounce, label, root=None, ignore_dirs=None):
+        self.queue = queue
+        self.lock = lock
+        self.queued = queued
+        self.debounce = debounce
+        self.label = label
+        self.root = Path(root).resolve() if root else None
+        self.ignore_dirs = ignore_dirs or []
+        self.last_seen = {}
+
+    def on_any_event(self, event):
+        try:
+            path = event.src_path
+            target = path if os.path.isdir(path) else os.path.dirname(path)
+            target = os.path.normpath(target)
+
+            if self.root:
+                try:
+                    Path(target).resolve().relative_to(self.root)
+                except ValueError:
+                    return
+
+            if self.ignore_dirs:
+                path_parts = Path(target).parts
+                for part in path_parts:
+                    if any(part.startswith(x) for x in self.ignore_dirs):
+                        return
+
+            base = os.path.basename(target)
+            if base.startswith(".") or base.startswith("~"):
+                return
+
+            now = time.time()
+            with self.lock:
+                if now - self.last_seen.get(target, 0) < self.debounce:
+                    return
+                self.last_seen[target] = now
+                if target in self.queued:
+                    return
+                self.queued.add(target)
+
+            add_watcher_log("info", f"{self.label}: {os.path.basename(target)}")
+            self.queue.put(target)
+
+        except Exception:
+            logger.exception("%s handler error", self.label)
+
+# ---------------------------------------------------------------------------
+# WORKERS
 # ---------------------------------------------------------------------------
 
 def inbox_worker():
-    """Process inbox import queue"""
+    logger.info("Inbox worker started")
+    add_watcher_log("info", "Inbox worker started")
     while not stop_event.is_set():
         try:
-            timestamp = inbox_q.get(timeout=1)
-            
-            # Debounce
-            time.sleep(DEBOUNCE_INBOX)
-            
-            # Clear the queue
-            while not inbox_q.empty():
-                try:
-                    inbox_q.get_nowait()
-                except Empty:
-                    break
-            
-            with inbox_lock:
-                inbox_queued.clear()
-            
-            add_watcher_log("info", "Starting automatic inbox import")
-            
-            # Run import
-            result = subprocess.run(
-                ["beet", "-c", BEETS_CONFIG, "import", "-A", str(INBOX_PATH)],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                timeout=IMPORT_TIMEOUT
-            )
-            
-            if result.returncode == 0:
-                add_watcher_log("success", "Automatic import completed")
-                invalidate_inbox_cache()
-                
-                # Trigger library regeneration
-                with lib_lock:
-                    if str(LIBRARY_PATH) not in lib_queued:
-                        lib_queued.add(str(LIBRARY_PATH))
-                        lib_q.put(time.time())
-            else:
-                add_watcher_log("error", f"Import failed: {result.stdout[:200]}")
-                
+            target = inbox_q.get(timeout=1)
         except Empty:
             continue
+
+        with inbox_lock:
+            inbox_queued.discard(target)
+
+        try:
+            time.sleep(DEBOUNCE_INBOX)
+            if not os.path.isdir(target):
+                continue
+
+            args = ["beet", "-c", BEETS_CONFIG, "import", "-A", target]
+            add_watcher_log("info", f"Importing: {os.path.basename(target)}")
+            subprocess.run(args, timeout=IMPORT_TIMEOUT)
+
+            invalidate_inbox_cache()
+            add_watcher_log("success", f"Import complete: {os.path.basename(target)}")
+            
+            tracks = get_tracks_without_lyrics(target)
+            if tracks:
+                with lyrics_lock:
+                    for track in tracks:
+                        if track not in lyrics_queued:
+                            lyrics_queued.add(track)
+                            lyrics_q.put((1, time.time(), track))
+                add_watcher_log("info", f"Queued {len(tracks)} tracks for lyrics")
+
         except Exception as e:
-            logger.error(f"Inbox worker error: {e}")
-            time.sleep(5)
+            add_watcher_log("error", f"Import failed: {str(e)[:50]}")
+        finally:
+            inbox_q.task_done()
 
 def library_worker():
-    """Process library regeneration queue"""
+    logger.info("Library worker started")
+    add_watcher_log("info", "Library worker started")
     while not stop_event.is_set():
         try:
-            timestamp = lib_q.get(timeout=1)
-            
-            # Debounce
-            time.sleep(DEBOUNCE_LIBRARY)
-            
-            # Clear the queue
-            while not lib_q.empty():
-                try:
-                    lib_q.get_nowait()
-                except Empty:
-                    break
-            
-            with lib_lock:
-                lib_queued.clear()
-            
-            add_watcher_log("info", "Starting library regeneration")
-            
-            # Run regeneration
-            result = subprocess.run(
-                ["python3", REGEN_SCRIPT],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                timeout=REGEN_TIMEOUT
-            )
-            
-            if result.returncode == 0:
-                add_watcher_log("success", "Library regeneration completed")
-            else:
-                add_watcher_log("error", f"Regeneration failed: {result.stdout[:200]}")
-                
+            target = lib_q.get(timeout=1)
         except Empty:
             continue
+
+        with lib_lock:
+            lib_queued.discard(target)
+
+        try:
+            time.sleep(DEBOUNCE_LIBRARY)
+            success = False
+
+            ok, _ = run_cmd_list(["python3", REGEN_SCRIPT, target], timeout=REGEN_TIMEOUT)
+            success = success or ok
+
+            if not success:
+                t2 = re.sub(r"\s*\[\d+\]$", "", target)
+                if t2 != target and os.path.exists(t2):
+                    ok, _ = run_cmd_list(["python3", REGEN_SCRIPT, t2], timeout=REGEN_TIMEOUT)
+                    success = success or ok
+
+            if not success:
+                ok, _ = run_cmd_list(["python3", REGEN_SCRIPT], timeout=REGEN_TIMEOUT * 2)
+                success = success or ok
+
+            if success:
+                add_watcher_log("success", f"Library updated: {os.path.basename(target)}")
+                run_cmd_list(["python3", "/app/scripts/recompute_recent.py"], timeout=120)
+
         except Exception as e:
-            logger.error(f"Library worker error: {e}")
+            add_watcher_log("error", f"Library update failed: {str(e)[:50]}")
+        finally:
+            lib_q.task_done()
+
+def cover_worker():
+    logger.info("Cover worker started")
+    add_watcher_log("info", "Cover worker started")
+    while not stop_event.is_set():
+        try:
+            target = cover_q.get(timeout=1)
+        except Empty:
+            continue
+
+        with cover_lock:
+            cover_queued.discard(target)
+
+        try:
+            album_dir = Path(target)
+            cover = album_dir / "cover.jpg"
+
+            if not album_dir.exists() or cover.exists():
+                continue
+
+            add_watcher_log("info", f"Fetching cover: {album_dir.name}")
+            ok, _ = run_cmd_list(["python3", "/app/scripts/fetch_cover.py", str(album_dir)], timeout=300)
+
+            if ok:
+                add_watcher_log("success", f"Cover fetched: {album_dir.name}")
+                run_cmd_list(["python3", REGEN_SCRIPT, str(album_dir)], timeout=REGEN_TIMEOUT)
+                run_cmd_list(["python3", "/app/scripts/recompute_recent.py"], timeout=120)
+
+        except Exception as e:
+            add_watcher_log("error", f"Cover fetch error: {str(e)[:50]}")
+        finally:
+            cover_q.task_done()
+
+def lyrics_worker():
+    """Worker for fetching lyrics with rate limiting"""
+    logger.info("Lyrics worker started")
+    add_watcher_log("info", "Lyrics worker started")
+    
+    while not stop_event.is_set():
+        try:
+            if not can_make_lyrics_request():
+                time.sleep(1)
+                continue
+            
+            try:
+                priority, timestamp, track_path = lyrics_q.get(timeout=1)
+            except Empty:
+                continue
+            
+            with lyrics_lock:
+                lyrics_queued.discard(track_path)
+            
+            try:
+                if not os.path.exists(track_path):
+                    continue
+                
+                if check_track_has_lyrics(track_path):
+                    continue
+                
+                retry_count = lyrics_failed_tracks.get(track_path, 0)
+                if retry_count >= LYRICS_MAX_RETRIES:
+                    continue
+                
+                time.sleep(DEBOUNCE_LYRICS)
+                
+                track_basename = os.path.basename(track_path)
+                add_watcher_log("info", f"Fetching lyrics: {track_basename}")
+                
+                record_lyrics_request()
+                
+                args = ["beet", "-c", BEETS_CONFIG, "lyrics", "-f", track_path]
+                ok, output = run_cmd_list(args, timeout=60)
+                
+                if "429" in output or "Too Many Requests" in output:
+                    record_lyrics_429()
+                    with lyrics_lock:
+                        if track_path not in lyrics_queued:
+                            lyrics_queued.add(track_path)
+                            lyrics_q.put((priority + 1, time.time(), track_path))
+                    lyrics_failed_tracks[track_path] = retry_count + 1
+                    continue
+                
+                if ok or "lyrics found" in output.lower():
+                    add_watcher_log("success", f"Lyrics found: {track_basename}")
+                    lyrics_failed_tracks.pop(track_path, None)
+                else:
+                    if "not found" not in output.lower():
+                        lyrics_failed_tracks[track_path] = retry_count + 1
+
+            except Exception as e:
+                logger.exception("Lyrics fetch failed")
+                lyrics_failed_tracks[track_path] = lyrics_failed_tracks.get(track_path, 0) + 1
+            finally:
+                lyrics_q.task_done()
+        
+        except Exception as e:
+            logger.exception("Lyrics worker error")
             time.sleep(5)
 
 # ---------------------------------------------------------------------------
-# STARTUP - START WATCHERS AND WORKERS
+# FASTAPI LIFESPAN
 # ---------------------------------------------------------------------------
 
 @app.on_event("startup")
-async def startup_event():
-    """Start file watchers and worker threads on app startup"""
-    global inbox_thread, lib_thread, cleanup_thread
-    global inbox_observer, lib_observer
-    
-    logger.info("=== Starting File Watchers ===")
-    
-    # Start inbox observer
-    if INBOX_PATH.exists():
-        inbox_observer = Observer()
-        inbox_observer.schedule(InboxHandler(), str(INBOX_PATH), recursive=True)
-        inbox_observer.start()
-        logger.info(f"? Inbox watcher started: {INBOX_PATH}")
-    else:
-        logger.warning(f"? Inbox path does not exist: {INBOX_PATH}")
-    
-    # Start library observer
-    if LIBRARY_PATH.exists():
-        lib_observer = Observer()
-        lib_observer.schedule(LibraryHandler(), str(LIBRARY_PATH), recursive=True)
-        lib_observer.start()
-        logger.info(f"? Library watcher started: {LIBRARY_PATH}")
-    else:
-        logger.warning(f"? Library path does not exist: {LIBRARY_PATH}")
-    
-    # Start worker threads
+def startup():
+    global inbox_thread, lib_thread, cover_thread, cleanup_thread, lyrics_thread
+    global inbox_observer, lib_observer, cover_observer
+
+    stop_event.clear()
+    add_watcher_log("info", "Application starting up")
+
     inbox_thread = threading.Thread(target=inbox_worker, daemon=True)
-    inbox_thread.start()
-    logger.info("? Inbox worker thread started")
-    
     lib_thread = threading.Thread(target=library_worker, daemon=True)
-    lib_thread.start()
-    logger.info("? Library worker thread started")
-    
-    # Start cleanup thread
+    cover_thread = threading.Thread(target=cover_worker, daemon=True)
     cleanup_thread = threading.Thread(target=inbox_cleanup_scheduler, daemon=True)
+    lyrics_thread = threading.Thread(target=lyrics_worker, daemon=True)
+
+    inbox_thread.start()
+    lib_thread.start()
+    cover_thread.start()
     cleanup_thread.start()
-    logger.info("? Cleanup scheduler started")
+    lyrics_thread.start()
+
+    inbox_handler = DebouncedHandler(
+        inbox_q, inbox_lock, inbox_queued, DEBOUNCE_INBOX, "INBOX",
+        root=INBOX_PATH, ignore_dirs=["_UNPACK_", "UNPACK", "unpack"]
+    )
     
-    add_watcher_log("success", "All watchers and workers started")
-    logger.info("=== Startup Complete ===")
+    inbox_observer = Observer()
+    inbox_observer.schedule(inbox_handler, str(INBOX_PATH), recursive=True)
+
+    lib_observer = Observer()
+    lib_observer.schedule(
+        DebouncedHandler(lib_q, lib_lock, lib_queued, DEBOUNCE_LIBRARY, "LIBRARY", root=LIBRARY_PATH),
+        str(LIBRARY_PATH), recursive=True
+    )
+
+    cover_observer = Observer()
+    cover_observer.schedule(
+        DebouncedHandler(cover_q, cover_lock, cover_queued, DEBOUNCE_COVER, "COVER", root=LIBRARY_PATH),
+        str(LIBRARY_PATH), recursive=True
+    )
+
+    inbox_observer.start()
+    lib_observer.start()
+    cover_observer.start()
+
+    add_watcher_log("success", "All workers and watchers started")
+    logger.info("Startup complete")
 
 @app.on_event("shutdown")
-async def shutdown_event():
-    """Stop watchers and workers on app shutdown"""
-    logger.info("=== Shutting Down ===")
-    
+def shutdown():
+    add_watcher_log("warning", "Application shutting down")
     stop_event.set()
-    
-    if inbox_observer:
-        inbox_observer.stop()
-        inbox_observer.join(timeout=5)
-        logger.info("? Inbox watcher stopped")
-    
-    if lib_observer:
-        lib_observer.stop()
-        lib_observer.join(timeout=5)
-        logger.info("? Library watcher stopped")
-    
-    logger.info("=== Shutdown Complete ===")
+
+    for obs in (inbox_observer, lib_observer, cover_observer):
+        if obs:
+            obs.stop()
+            obs.join()
+
+    logger.info("Shutdown complete")

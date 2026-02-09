@@ -30,10 +30,6 @@ logger = logging.getLogger("smart_regen")
 # ---------------- PATH NORMALIZATION ---------------- #
 
 def to_relative_folder(folder_abs: str) -> str:
-    """
-    Convert an absolute folder path under LIB_ROOT into a
-    relative path like '/Artist/Album' for the frontend.
-    """
     try:
         rel = os.path.relpath(folder_abs, LIB_ROOT)
     except ValueError:
@@ -47,10 +43,6 @@ def to_relative_folder(folder_abs: str) -> str:
 
 
 def to_relative_cover(cover_abs: str) -> str:
-    """
-    Convert an absolute cover path into a relative path
-    rooted at /music/library, e.g. '/Artist/Album/cover.jpg'.
-    """
     if not cover_abs:
         return None
 
@@ -107,8 +99,12 @@ def save_albums(albums):
         json.dump(albums, f, indent=2)
 
 
+# ---------------- HARDENED TRACK PARSER ---------------- #
+
 def get_tracks(album_id):
-    fmt = "$disc\t$track\t$title\t$length\t$bitrate\t$format\t$path"
+    # RAW STRING — prevents Python from escaping \t
+    fmt = r"$disc\t$track\t$title\t$length\t$bitrate\t$format\t$path"
+
     args = ["beet", "-c", BEETS_CONFIG, "list", "-f", fmt, f"album_id:{album_id}"]
     out = run_beet(args)
 
@@ -117,29 +113,45 @@ def get_tracks(album_id):
     first_path = None
 
     for line in out.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+
         parts = line.split("\t")
-        if len(parts) < 7:
+
+        if len(parts) != 7:
+            logger.error(
+                f"Unexpected track row format ({len(parts)} fields): {line!r}"
+            )
             continue
 
         disc, track, title, length, bitrate, fmtc, path = parts
 
-        try: disc = int(disc)
-        except: disc = 1
+        # Safe parsing
+        try:
+            disc = int(disc)
+        except:
+            disc = 1
 
-        try: track = int(track)
-        except: track = None
+        try:
+            track = int(track)
+        except:
+            track = None
 
-        try: length = int(float(length))
-        except: length = None
+        try:
+            length = int(float(length))
+        except:
+            length = 0
 
-        try: bitrate = int(bitrate)
-        except: bitrate = None
+        try:
+            bitrate = int(bitrate)
+        except:
+            bitrate = None
 
         if first_path is None:
             first_path = path
 
-        if length:
-            total_length += length
+        total_length += length
 
         tracks.append({
             "disc": disc,
@@ -169,7 +181,7 @@ def find_cover(folder):
 
 
 def get_album_metadata(album_id):
-    fmt = "$albumartist\t$album\t$year"
+    fmt = r"$albumartist\t$album\t$year"
     args = ["beet", "-c", BEETS_CONFIG, "list", "-a", "-f", fmt, f"id:{album_id}"]
     out = run_beet(args).strip()
 
@@ -277,3 +289,4 @@ def main_loop():
 
 if __name__ == "__main__":
     main_loop()
+

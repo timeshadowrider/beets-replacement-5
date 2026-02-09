@@ -10,3 +10,4 @@ aiofiles
 pydantic
 humanize
 packaging
+python-multipart

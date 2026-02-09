@@ -29,6 +29,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     sed \
     gawk \
     flac \
+    # MPD client for Volumio playlist push 
+    mpc \ 
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

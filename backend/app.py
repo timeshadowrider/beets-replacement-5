@@ -14,6 +14,7 @@ import threading
 import tempfile
 import shutil
 import asyncio
+import fcntl  # ADDED: For file locking to prevent concurrent imports
 
 from pathlib import Path
 from datetime import datetime
@@ -85,6 +86,9 @@ DEBOUNCE_LYRICS = 10.0
 
 IMPORT_TIMEOUT = 3600
 REGEN_TIMEOUT = 900
+
+# ADDED: Import lock file to prevent concurrent imports
+IMPORT_LOCK_FILE = "/tmp/beets_import.lock"
 
 # Lyrics rate limiting
 LYRICS_RATE_LIMIT = 10
@@ -651,12 +655,38 @@ def refresh_library():
 
 @app.post("/api/library/import")
 def import_library(background_tasks: BackgroundTasks):
+    """Manual import with file locking to prevent concurrent imports"""
     args = ["beet", "-c", BEETS_CONFIG, "import", "-q", "-A", str(INBOX_PATH)]
 
     def run():
-        add_watcher_log("info", "Manual import started")
-        subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=IMPORT_TIMEOUT)
-        add_watcher_log("success", "Manual import completed")
+        lock_file = None
+        try:
+            # Try to acquire exclusive lock
+            lock_file = open(IMPORT_LOCK_FILE, 'w')
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except IOError:
+            add_watcher_log("warning", "Import already running, manual import skipped")
+            if lock_file:
+                lock_file.close()
+            return
+        
+        try:
+            add_watcher_log("info", "Manual import started")
+            result = subprocess.run(
+                args,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                timeout=IMPORT_TIMEOUT
+            )
+            if result.returncode == 0:
+                add_watcher_log("success", "Manual import completed")
+            else:
+                add_watcher_log("error", f"Manual import failed: {result.stdout[:200]}")
+        finally:
+            if lock_file:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                lock_file.close()
 
     background_tasks.add_task(run)
     return {"status": "started", "cmd": args}
@@ -678,7 +708,7 @@ def recent(limit: int = 12):
         return []
 
 # =============================================================================
-# SLSKD INTEGRATION - Add this section to your app.py
+# SLSKD INTEGRATION
 # =============================================================================
 
 import httpx
@@ -1206,13 +1236,12 @@ class CoverHandler(FileSystemEventHandler):
 # ---------------------------------------------------------------------------
 
 def inbox_worker():
-    """Process inbox import queue with settling timer"""
+    """Process inbox import queue with settling timer and file locking"""
     while not stop_event.is_set():
         try:
             timestamp = inbox_q.get(timeout=1)
             
-            # Debounce
-            # Settling timer - wait until no activity
+            # Debounce - settling timer
             deadline = time.time() + DEBOUNCE_INBOX
             while time.time() < deadline:
                 try:
@@ -1232,28 +1261,48 @@ def inbox_worker():
             with inbox_lock:
                 inbox_queued.clear()
             
-            add_watcher_log("info", "Starting automatic inbox import (after settling)")
+            # ============================================
+            # CRITICAL: Acquire exclusive file lock
+            # ============================================
+            lock_file = None
+            try:
+                lock_file = open(IMPORT_LOCK_FILE, 'w')
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except IOError:
+                add_watcher_log("warning", "Import already running, skipping this trigger")
+                if lock_file:
+                    lock_file.close()
+                continue
             
-            # Run import
-            result = subprocess.run(
-                ["beet", "-c", BEETS_CONFIG, "import", "-A", str(INBOX_PATH)],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                timeout=IMPORT_TIMEOUT
-            )
-            
-            if result.returncode == 0:
-                add_watcher_log("success", "Automatic import completed")
-                invalidate_inbox_cache()
+            try:
+                add_watcher_log("info", "Starting automatic inbox import (after settling)")
                 
-                # Trigger library regeneration
-                with lib_lock:
-                    if str(LIBRARY_PATH) not in lib_queued:
-                        lib_queued.add(str(LIBRARY_PATH))
-                        lib_q.put(time.time())
-            else:
-                add_watcher_log("error", f"Import failed: {result.stdout[:200]}")
+                # Run import
+                result = subprocess.run(
+                    ["beet", "-c", BEETS_CONFIG, "import", "-A", str(INBOX_PATH)],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    timeout=IMPORT_TIMEOUT
+                )
+                
+                if result.returncode == 0:
+                    add_watcher_log("success", "Automatic import completed")
+                    invalidate_inbox_cache()
+                    
+                    # Trigger library regeneration
+                    with lib_lock:
+                        if str(LIBRARY_PATH) not in lib_queued:
+                            lib_queued.add(str(LIBRARY_PATH))
+                            lib_q.put(time.time())
+                else:
+                    add_watcher_log("error", f"Import failed: {result.stdout[:200]}")
+            
+            finally:
+                # Release lock
+                if lock_file:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                    lock_file.close()
                 
         except Empty:
             continue
@@ -1441,8 +1490,9 @@ def lyrics_worker():
         except Exception as e:
             logger.exception("Lyrics worker error")
             time.sleep(5)
+
 # ---------------------------------------------------------------------------
-# STARTUP / SHUTDOWN — CLEAN, SINGLE, CORRECT IMPLEMENTATION
+# STARTUP / SHUTDOWN
 # ---------------------------------------------------------------------------
 
 @app.on_event("startup")
@@ -1453,9 +1503,7 @@ async def startup_event():
 
     logger.info("=== Starting File Watchers ===")
 
-    # -----------------------------
     # Inbox Watcher
-    # -----------------------------
     if INBOX_PATH.exists():
         inbox_observer = Observer()
         inbox_observer.schedule(InboxHandler(), str(INBOX_PATH), recursive=True)
@@ -1464,9 +1512,7 @@ async def startup_event():
     else:
         logger.warning(f"? Inbox path does not exist: {INBOX_PATH}")
 
-    # -----------------------------
     # Library Watcher
-    # -----------------------------
     if LIBRARY_PATH.exists():
         lib_observer = Observer()
         lib_observer.schedule(LibraryHandler(), str(LIBRARY_PATH), recursive=True)
@@ -1475,18 +1521,14 @@ async def startup_event():
     else:
         logger.warning(f"? Library path does not exist: {LIBRARY_PATH}")
 
-    # -----------------------------
     # Cover Watcher
-    # -----------------------------
     if LIBRARY_PATH.exists():
         cover_observer = Observer()
         cover_observer.schedule(CoverHandler(), str(LIBRARY_PATH), recursive=True)
         cover_observer.start()
         logger.info(f"? Cover watcher started: {LIBRARY_PATH}")
 
-    # -----------------------------
     # Worker Threads
-    # -----------------------------
     inbox_thread = threading.Thread(target=inbox_worker, daemon=True)
     inbox_thread.start()
     logger.info("? Inbox worker thread started")
@@ -1503,14 +1545,12 @@ async def startup_event():
     lyrics_thread.start()
     logger.info("? Lyrics worker thread started")
 
-    # -----------------------------
     # Cleanup Scheduler
-    # -----------------------------
     cleanup_thread = threading.Thread(target=inbox_cleanup_scheduler, daemon=True)
     cleanup_thread.start()
     logger.info("? Cleanup scheduler started")
 
-    add_watcher_log("success", "All watchers and workers started (including cover & lyrics)")
+    add_watcher_log("success", "All watchers and workers started (with import locking enabled)")
     logger.info("=== Startup Complete ===")
 
 

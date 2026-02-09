@@ -9,7 +9,8 @@ services:
       - "7080:7080"
       - "8337:8337"
     environment:
-      BEETS_CONFIG: /config/config.yaml
+      BEETSDIR: /config
+      #BEETS_CONFIG: /config/config.yaml
       BEETS_LIBRARY: /data/beets-library.blb
       APP_PORT: "7080"
       INBOX_DIR: /inbox

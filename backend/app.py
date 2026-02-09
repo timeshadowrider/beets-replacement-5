@@ -651,7 +651,7 @@ def refresh_library():
 
 @app.post("/api/library/import")
 def import_library(background_tasks: BackgroundTasks):
-    args = ["beet", "-c", BEETS_CONFIG, "import", "-A", str(INBOX_PATH)]
+    args = ["beet", "-c", BEETS_CONFIG, "import", "-q", "-A", str(INBOX_PATH)]
 
     def run():
         add_watcher_log("info", "Manual import started")
@@ -1174,6 +1174,34 @@ class LibraryHandler(FileSystemEventHandler):
                 add_watcher_log("info", f"Library change detected: {filename}")
 
 # ---------------------------------------------------------------------------
+# COVER AND LYRICS HANDLERS
+# ---------------------------------------------------------------------------
+
+class CoverHandler(FileSystemEventHandler):
+    """Watch for new albums and trigger cover art fetching"""
+    def on_created(self, event):
+        if not event.is_directory:
+            return
+        
+        album_dir = Path(event.src_path)
+        
+        # Skip hidden directories
+        if album_dir.name.startswith("."):
+            return
+        
+        # Check if cover.jpg already exists
+        cover_file = album_dir / "cover.jpg"
+        if cover_file.exists():
+            return
+        
+        with cover_lock:
+            album_path = str(album_dir)
+            if album_path not in cover_queued:
+                cover_queued.add(album_path)
+                cover_q.put(album_path)
+                add_watcher_log("info", f"New album detected (needs cover): {album_dir.name}")
+
+# ---------------------------------------------------------------------------
 # WORKER THREADS
 # ---------------------------------------------------------------------------
 
@@ -1267,18 +1295,159 @@ def library_worker():
             time.sleep(5)
 
 # ---------------------------------------------------------------------------
-# STARTUP - START WATCHERS AND WORKERS
+# COVER WORKER
+# ---------------------------------------------------------------------------
+
+def cover_worker():
+    """Process cover art fetching queue"""
+    logger.info("Cover worker started")
+    add_watcher_log("info", "Cover worker started")
+    
+    while not stop_event.is_set():
+        try:
+            album_dir = cover_q.get(timeout=1)
+        except Empty:
+            continue
+        
+        with cover_lock:
+            cover_queued.discard(album_dir)
+        
+        try:
+            # Debounce
+            time.sleep(DEBOUNCE_COVER)
+            
+            album_path = Path(album_dir)
+            cover_file = album_path / "cover.jpg"
+            
+            # Skip if cover already exists or directory doesn't exist
+            if not album_path.exists() or cover_file.exists():
+                continue
+            
+            add_watcher_log("info", f"Fetching cover art: {album_path.name}")
+            
+            # Run fetch_cover.py script
+            result = subprocess.run(
+                ["python3", "/app/scripts/fetch_cover.py", str(album_path)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                timeout=300
+            )
+            
+            if result.returncode == 0 and cover_file.exists():
+                add_watcher_log("success", f"Cover art fetched: {album_path.name}")
+                
+                # Trigger library regeneration to update the album with cover
+                with lib_lock:
+                    if str(LIBRARY_PATH) not in lib_queued:
+                        lib_queued.add(str(LIBRARY_PATH))
+                        lib_q.put(time.time())
+            else:
+                add_watcher_log("warning", f"Cover fetch failed: {album_path.name}")
+                
+        except Exception as e:
+            logger.error(f"Cover worker error: {e}")
+        finally:
+            cover_q.task_done()
+
+# ---------------------------------------------------------------------------
+# LYRICS WORKER
+# ---------------------------------------------------------------------------
+
+def lyrics_worker():
+    """Process lyrics fetching queue"""
+    logger.info("Lyrics worker started")
+    add_watcher_log("info", "Lyrics worker started")
+    
+    while not stop_event.is_set():
+        try:
+            # Check rate limiting
+            if not can_make_lyrics_request():
+                time.sleep(1)
+                continue
+            
+            try:
+                priority, timestamp, track_path = lyrics_q.get(timeout=1)
+            except Empty:
+                continue
+            
+            with lyrics_lock:
+                lyrics_queued.discard(track_path)
+            
+            try:
+                # Skip if track doesn't exist
+                if not os.path.exists(track_path):
+                    continue
+                
+                # Skip if already has lyrics
+                if check_track_has_lyrics(track_path):
+                    continue
+                
+                # Check retry count
+                retry_count = lyrics_failed_tracks.get(track_path, 0)
+                if retry_count >= LYRICS_MAX_RETRIES:
+                    logger.debug(f"Max retries reached for: {os.path.basename(track_path)}")
+                    continue
+                
+                # Debounce
+                time.sleep(DEBOUNCE_LYRICS)
+                
+                track_name = os.path.basename(track_path)
+                add_watcher_log("info", f"Fetching lyrics: {track_name}")
+                
+                record_lyrics_request()
+                
+                # Fetch lyrics using beets
+                result = subprocess.run(
+                    ["beet", "-c", BEETS_CONFIG, "lyrics", "-f", track_path],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    timeout=60
+                )
+                
+                # Check for rate limiting
+                if "429" in result.stdout or "Too Many Requests" in result.stdout:
+                    record_lyrics_429()
+                    # Re-queue with lower priority
+                    with lyrics_lock:
+                        if track_path not in lyrics_queued:
+                            lyrics_queued.add(track_path)
+                            lyrics_q.put((priority + 1, time.time(), track_path))
+                    lyrics_failed_tracks[track_path] = retry_count + 1
+                    continue
+                
+                if result.returncode == 0 or "lyrics found" in result.stdout.lower():
+                    add_watcher_log("success", f"Lyrics found: {track_name}")
+                    lyrics_failed_tracks.pop(track_path, None)
+                else:
+                    if "not found" not in result.stdout.lower():
+                        lyrics_failed_tracks[track_path] = retry_count + 1
+                        
+            except Exception as e:
+                logger.error(f"Lyrics fetch error: {e}")
+                lyrics_failed_tracks[track_path] = lyrics_failed_tracks.get(track_path, 0) + 1
+            finally:
+                lyrics_q.task_done()
+                
+        except Exception as e:
+            logger.exception("Lyrics worker error")
+            time.sleep(5)
+# ---------------------------------------------------------------------------
+# STARTUP / SHUTDOWN — CLEAN, SINGLE, CORRECT IMPLEMENTATION
 # ---------------------------------------------------------------------------
 
 @app.on_event("startup")
 async def startup_event():
-    """Start file watchers and worker threads on app startup"""
-    global inbox_thread, lib_thread, cleanup_thread
-    global inbox_observer, lib_observer
-    
+    """Start file watchers and worker threads on app startup."""
+    global inbox_thread, lib_thread, cover_thread, lyrics_thread, cleanup_thread
+    global inbox_observer, lib_observer, cover_observer
+
     logger.info("=== Starting File Watchers ===")
-    
-    # Start inbox observer
+
+    # -----------------------------
+    # Inbox Watcher
+    # -----------------------------
     if INBOX_PATH.exists():
         inbox_observer = Observer()
         inbox_observer.schedule(InboxHandler(), str(INBOX_PATH), recursive=True)
@@ -1286,8 +1455,10 @@ async def startup_event():
         logger.info(f"? Inbox watcher started: {INBOX_PATH}")
     else:
         logger.warning(f"? Inbox path does not exist: {INBOX_PATH}")
-    
-    # Start library observer
+
+    # -----------------------------
+    # Library Watcher
+    # -----------------------------
     if LIBRARY_PATH.exists():
         lib_observer = Observer()
         lib_observer.schedule(LibraryHandler(), str(LIBRARY_PATH), recursive=True)
@@ -1295,39 +1466,66 @@ async def startup_event():
         logger.info(f"? Library watcher started: {LIBRARY_PATH}")
     else:
         logger.warning(f"? Library path does not exist: {LIBRARY_PATH}")
-    
-    # Start worker threads
+
+    # -----------------------------
+    # Cover Watcher
+    # -----------------------------
+    if LIBRARY_PATH.exists():
+        cover_observer = Observer()
+        cover_observer.schedule(CoverHandler(), str(LIBRARY_PATH), recursive=True)
+        cover_observer.start()
+        logger.info(f"? Cover watcher started: {LIBRARY_PATH}")
+
+    # -----------------------------
+    # Worker Threads
+    # -----------------------------
     inbox_thread = threading.Thread(target=inbox_worker, daemon=True)
     inbox_thread.start()
     logger.info("? Inbox worker thread started")
-    
+
     lib_thread = threading.Thread(target=library_worker, daemon=True)
     lib_thread.start()
     logger.info("? Library worker thread started")
-    
-    # Start cleanup thread
+
+    cover_thread = threading.Thread(target=cover_worker, daemon=True)
+    cover_thread.start()
+    logger.info("? Cover worker thread started")
+
+    lyrics_thread = threading.Thread(target=lyrics_worker, daemon=True)
+    lyrics_thread.start()
+    logger.info("? Lyrics worker thread started")
+
+    # -----------------------------
+    # Cleanup Scheduler
+    # -----------------------------
     cleanup_thread = threading.Thread(target=inbox_cleanup_scheduler, daemon=True)
     cleanup_thread.start()
     logger.info("? Cleanup scheduler started")
-    
-    add_watcher_log("success", "All watchers and workers started")
+
+    add_watcher_log("success", "All watchers and workers started (including cover & lyrics)")
     logger.info("=== Startup Complete ===")
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Stop watchers and workers on app shutdown"""
+    """Stop watchers and workers on app shutdown."""
     logger.info("=== Shutting Down ===")
-    
+
     stop_event.set()
-    
+
     if inbox_observer:
         inbox_observer.stop()
         inbox_observer.join(timeout=5)
         logger.info("? Inbox watcher stopped")
-    
+
     if lib_observer:
         lib_observer.stop()
         lib_observer.join(timeout=5)
         logger.info("? Library watcher stopped")
-    
+
+    if cover_observer:
+        cover_observer.stop()
+        cover_observer.join(timeout=5)
+        logger.info("? Cover watcher stopped")
+
     logger.info("=== Shutdown Complete ===")

@@ -13,6 +13,7 @@ import time
 import threading
 import tempfile
 import shutil
+import asyncio
 
 from pathlib import Path
 from datetime import datetime
@@ -676,6 +677,226 @@ def recent(limit: int = 12):
     except Exception:
         return []
 
+# =============================================================================
+# SLSKD INTEGRATION - Add this section to your app.py
+# =============================================================================
+
+import httpx
+from typing import List, Dict, Any
+
+# slskd Configuration
+SLSKD_URL = "http://localhost:5030"
+SLSKD_API_KEY = "PV1RixwWGOi91oVYfSMhd7JNVy1hj6jpcBOcdM+z1mKB+JnIQ2c4nwVWLgYi2JHd"
+
+def slskd_headers():
+    """Get headers for slskd API requests"""
+    return {
+        "X-API-Key": SLSKD_API_KEY,
+        "Content-Type": "application/json"
+    }
+
+async def search_slskd(query: str, file_type: str = "flac") -> Dict[str, Any]:
+    """
+    Search slskd for files
+    
+    Args:
+        query: Search query string
+        file_type: File type filter (flac, mp3, etc.)
+    
+    Returns:
+        Search results from slskd
+    """
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            # Start a search
+            search_response = await client.post(
+                f"{SLSKD_URL}/api/v0/searches",
+                headers=slskd_headers(),
+                json={
+                    "searchText": query,
+                    "filterResponses": True
+                }
+            )
+            
+            if search_response.status_code != 201:
+                logger.error(f"slskd search failed: {search_response.status_code}")
+                return {"error": "Search failed", "results": []}
+            
+            search_data = search_response.json()
+            search_id = search_data.get("id")
+            
+            if not search_id:
+                return {"error": "No search ID returned", "results": []}
+            
+            # Wait a bit for results to come in
+            await asyncio.sleep(3)
+            
+            # Get search results
+            results_response = await client.get(
+                f"{SLSKD_URL}/api/v0/searches/{search_id}",
+                headers=slskd_headers()
+            )
+            
+            if results_response.status_code != 200:
+                logger.error(f"Failed to get search results: {results_response.status_code}")
+                return {"error": "Failed to get results", "results": []}
+            
+            results = results_response.json()
+            
+            # Filter and format results
+            filtered_results = []
+            
+            for response in results.get("responses", []):
+                username = response.get("username", "Unknown")
+                
+                for file in response.get("files", []):
+                    filename = file.get("filename", "")
+                    
+                    # Filter by file type if specified
+                    if file_type and not filename.lower().endswith(f".{file_type.lower()}"):
+                        continue
+                    
+                    filtered_results.append({
+                        "username": username,
+                        "filename": filename,
+                        "size": file.get("size", 0),
+                        "bitrate": file.get("bitRate"),
+                        "length": file.get("length"),
+                        "quality": file.get("bitDepth"),
+                        "search_id": search_id,
+                        "file_id": file.get("id")
+                    })
+            
+            # Sort by bitrate (prefer higher quality)
+            filtered_results.sort(key=lambda x: x.get("bitrate") or 0, reverse=True)
+            
+            return {
+                "search_id": search_id,
+                "query": query,
+                "total_results": len(filtered_results),
+                "results": filtered_results[:50]  # Limit to top 50
+            }
+            
+    except Exception as e:
+        logger.error(f"slskd search error: {e}")
+        return {"error": str(e), "results": []}
+
+
+@app.get("/api/slskd/search")
+async def api_slskd_search(
+    artist: str,
+    album: str,
+    track: Optional[str] = None,
+    file_type: str = "flac"
+):
+    """
+    Search slskd for missing tracks
+    
+    Query params:
+        artist: Artist name
+        album: Album name
+        track: Optional specific track name
+        file_type: File type to search for (default: flac)
+    
+    Example:
+        /api/slskd/search?artist=Alejandro%20Sanz&album=ELDISCO&track=No%20Tengo%20Nada&file_type=flac
+    """
+    # Build search query
+    query_parts = [artist, album]
+    if track:
+        query_parts.append(track)
+    
+    query = " ".join(query_parts)
+    
+    logger.info(f"Searching slskd: {query} (type: {file_type})")
+    
+    results = await search_slskd(query, file_type)
+    
+    return JSONResponse(content=results)
+
+
+@app.post("/api/slskd/download")
+async def api_slskd_download(
+    username: str = Form(...),
+    filename: str = Form(...),
+    search_id: str = Form(...)
+):
+    """
+    Queue a download from slskd
+    
+    Form params:
+        username: Username to download from
+        filename: File path to download
+        search_id: Search ID from the search
+    """
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{SLSKD_URL}/api/v0/transfers/downloads",
+                headers=slskd_headers(),
+                json={
+                    "username": username,
+                    "files": [filename]
+                }
+            )
+            
+            if response.status_code in [200, 201]:
+                logger.info(f"Queued download: {filename} from {username}")
+                return JSONResponse(content={
+                    "success": True,
+                    "message": f"Download queued: {filename}",
+                    "username": username,
+                    "filename": filename
+                })
+            else:
+                logger.error(f"Download queue failed: {response.status_code}")
+                return JSONResponse(
+                    status_code=500,
+                    content={
+                        "success": False,
+                        "error": f"Failed to queue download: {response.status_code}"
+                    }
+                )
+                
+    except Exception as e:
+        logger.error(f"Download error: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": str(e)
+            }
+        )
+
+
+@app.get("/api/slskd/downloads")
+async def api_slskd_downloads():
+    """Get current download queue from slskd"""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                f"{SLSKD_URL}/api/v0/transfers/downloads",
+                headers=slskd_headers()
+            )
+            
+            if response.status_code == 200:
+                downloads = response.json()
+                return JSONResponse(content=downloads)
+            else:
+                return JSONResponse(
+                    status_code=500,
+                    content={"error": "Failed to get downloads"}
+                )
+                
+    except Exception as e:
+        logger.error(f"Get downloads error: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e)}
+        )
+
+
+
 # ---------------------------------------------------------------------------
 # WATCHER STATUS API
 # ---------------------------------------------------------------------------
@@ -940,11 +1161,17 @@ class LibraryHandler(FileSystemEventHandler):
     def on_created(self, event):
         if event.is_directory:
             return
+        
+        # Ignore temp files
+        filename = Path(event.src_path).name
+        if ".beets" in filename or filename.startswith("."):
+            return
+        
         with lib_lock:
             if str(LIBRARY_PATH) not in lib_queued:
                 lib_queued.add(str(LIBRARY_PATH))
                 lib_q.put(time.time())
-                add_watcher_log("info", f"Library change detected: {Path(event.src_path).name}")
+                add_watcher_log("info", f"Library change detected: {filename}")
 
 # ---------------------------------------------------------------------------
 # WORKER THREADS

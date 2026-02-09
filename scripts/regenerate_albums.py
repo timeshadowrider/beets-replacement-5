@@ -38,29 +38,47 @@ def run_beet(args):
 
 
 def get_all_albums():
-    fmt = "$id\t$albumartist\t$album\t$year"
+    # Added: $genre, $label, $original_year, $disctotal
+    fmt = "$id\t$albumartist\t$album\t$year\t$genre\t$label\t$original_year\t$disctotal"
     args = ["beet", "-c", BEETS_CONFIG, "list", "-a", "-f", fmt]
     out = run_beet(args)
 
     albums = []
     for line in out.splitlines():
         parts = line.split("\t")
-        if len(parts) < 4:
+        if len(parts) < 8:
             continue
-        album_id, artist, album, year = parts
+        album_id, artist, album, year, genre, label, original_year, disctotal = parts
         if not album_id.isdigit():
             continue
+        
+        # Convert original_year
+        try:
+            orig_year = int(original_year) if original_year and original_year != "0000" else None
+        except:
+            orig_year = None
+        
+        # Convert disctotal
+        try:
+            disc_total = int(disctotal) if disctotal else 1
+        except:
+            disc_total = 1
+            
         albums.append({
             "id": int(album_id),
             "albumartist": artist,
             "album": album,
-            "year": year
+            "year": year,
+            "genre": genre if genre else None,
+            "label": label if label else None,
+            "original_year": orig_year,
+            "disctotal": disc_total
         })
     return albums
 
 
 def get_tracks_for_album(album_id):
-    fmt = "$disc\t$track\t$title\t$length\t$bitrate\t$format\t$path"
+    fmt = "$disc\t$track\t$title\t$length\t$bitrate\t$format\t$path\t$artist"
     args = [
         "beet", "-c", BEETS_CONFIG, "list", "-f", fmt,
         f"album_id:{album_id}"
@@ -73,10 +91,10 @@ def get_tracks_for_album(album_id):
 
     for line in out.splitlines():
         parts = line.split("\t")
-        if len(parts) < 7:
+        if len(parts) < 8:
             continue
 
-        disc, track, title, length, bitrate, fmtc, path = parts
+        disc, track, title, length, bitrate, fmtc, path, artist = parts
 
         try:
             disc = int(disc)
@@ -108,6 +126,7 @@ def get_tracks_for_album(album_id):
             "disc": disc,
             "track": track,
             "title": title,
+            "artist": artist if artist else None,
             "length": length,
             "bitrate": bitrate,
             "format": fmtc,
@@ -167,11 +186,28 @@ def regenerate():
     logger.info("Starting full regeneration")
 
     albums = get_all_albums()
-    logger.info(f"Found {len(albums)} albums")
+    logger.info(f"Found {len(albums)} album entries from beets")
+
+    # Deduplicate by artist+album (multi-disc albums have multiple entries)
+    seen = {}
+    for a in albums:
+        key = (a["albumartist"], a["album"])
+        if key not in seen:
+            seen[key] = a
+        else:
+            # Keep the one with the most complete info (non-null label, etc.)
+            existing = seen[key]
+            if not existing["label"] and a["label"]:
+                seen[key] = a
+            elif not existing["genre"] and a["genre"]:
+                seen[key] = a
+    
+    unique_albums = list(seen.values())
+    logger.info(f"Deduplicated to {len(unique_albums)} unique albums")
 
     output = []
 
-    for a in albums:
+    for a in unique_albums:
         logger.info(f"Processing: {a['albumartist']} - {a['album']}")
 
         tracks, total_length, first_path = get_tracks_for_album(a["id"])
@@ -182,7 +218,22 @@ def regenerate():
 
         # first_path is a full path like /music/library/Artist/Album/track.flac
         folder_abs = os.path.dirname(first_path)
-        cover_abs = find_cover(folder_abs)
+        
+        # Enhanced cover finding - try multiple extensions
+        cover_abs = None
+        for ext in ['jpg', 'jpeg', 'png', 'webp']:
+            test_path = os.path.join(folder_abs, f"cover.{ext}")
+            if os.path.exists(test_path):
+                cover_abs = test_path
+                break
+        
+        # If no cover.* found, try folder.*
+        if not cover_abs:
+            for ext in ['jpg', 'jpeg', 'png']:
+                test_path = os.path.join(folder_abs, f"folder.{ext}")
+                if os.path.exists(test_path):
+                    cover_abs = test_path
+                    break
 
         folder_rel = to_relative_folder(folder_abs)
         cover_rel = to_relative_cover(cover_abs) if cover_abs else None
@@ -191,6 +242,10 @@ def regenerate():
             "albumartist": a["albumartist"],
             "album": a["album"],
             "year": a["year"],
+            "genre": a["genre"],
+            "label": a["label"],
+            "original_year": a["original_year"],
+            "disctotal": a["disctotal"],
             # frontend uses this to build /music/library + folder + /cover.jpg
             "folder": folder_rel,
             # optional, but now also relative and consistent

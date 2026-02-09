@@ -151,72 +151,116 @@ button:disabled {
   color: #eee;
 }
 
-/* Recently Added */
-.recently-added-box {
+/* Library Statistics Detailed */
+.library-stats-detailed-box {
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
-.recently-added-box h2 {
+.library-stats-detailed-box h2 {
   flex-shrink: 0;
   margin-bottom: 8px;
 }
-.recently-added-scroll {
-  display: flex;
+.library-stats-detailed {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
   gap: 8px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding-bottom: 4px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
-.recently-added-scroll::-webkit-scrollbar {
-  height: 6px;
-}
-.recently-added-scroll::-webkit-scrollbar-track {
-  background: #181818;
-  border-radius: 3px;
-}
-.recently-added-scroll::-webkit-scrollbar-thumb {
-  background: #0ff;
-  border-radius: 3px;
-}
-.recently-added-item {
-  flex-shrink: 0;
-  width: 120px;
-  cursor: pointer;
-  transition: transform 0.2s;
-}
-.recently-added-item:hover {
-  transform: scale(1.05);
-}
-.recently-added-cover {
-  width: 120px;
-  height: 120px;
+.stat-category {
+  background: #1a1a1a;
   border-radius: 4px;
-  overflow: hidden;
-  border: 1px solid #444;
-  background: #111;
-  margin-bottom: 4px;
+  padding: 6px 8px;
+  border: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
-.recently-added-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.recently-added-title {
+.stat-category h3 {
   font-size: 11px;
-  font-weight: 500;
-  color: #fff;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  margin-bottom: 2px;
-}
-.recently-added-artist {
-  font-size: 10px;
   color: #0ff;
+  margin: 0 0 6px 0;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+.stat-list {
+  font-size: 11px;
+  color: #ccc;
+  line-height: 1.4;
+  flex: 1;
+  min-height: 0;
+}
+.stat-list.scrollable {
+  overflow-y: auto;
+  max-height: 120px;
+}
+.stat-list::-webkit-scrollbar {
+  width: 4px;
+}
+.stat-list::-webkit-scrollbar-track {
+  background: #111;
+  border-radius: 2px;
+}
+.stat-list::-webkit-scrollbar-thumb {
+  background: #0ff;
+  border-radius: 2px;
+}
+.stat-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+  border-bottom: 1px solid #222;
+}
+.stat-item:last-child {
+  border-bottom: none;
+}
+.stat-name {
+  color: #ccc;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+  margin-right: 8px;
+}
+.stat-count {
+  color: #0ff;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.stat-empty {
+  color: #555;
+  font-style: italic;
+  font-size: 10px;
+  padding: 4px 0;
+}
+.missing-album-item {
+  padding: 3px 0;
+  border-bottom: 1px solid #222;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.missing-album-item:hover {
+  color: #0ff;
+}
+.missing-album-item:last-child {
+  border-bottom: none;
+}
+.missing-album-name {
+  font-size: 10px;
+  color: #ccc;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.missing-album-info {
+  font-size: 9px;
+  color: #666;
+  margin-top: 1px;
 }
 
 /* Album list */
@@ -258,8 +302,9 @@ button:disabled {
 }
 .album-grid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
   gap: 6px;
+  max-width: 100%;
 }
 .album-grid-item {
   background: #181818;
@@ -1203,6 +1248,223 @@ button:disabled {
   padding: 20px;
   font-style: italic;
 }
+
+/* =============================================================================
+   SLSKD SEARCH MODAL - Add to index.html <style> section
+   ============================================================================= */
+
+/* Search Modal */
+.slskd-modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 2000;
+  align-items: center;
+  justify-content: center;
+}
+
+.slskd-modal.active {
+  display: flex;
+}
+
+.slskd-modal-content {
+  background: #1a1a1a;
+  border: 1px solid #0ff;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 900px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+}
+
+.slskd-modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #333;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.slskd-modal-header h3 {
+  margin: 0;
+  color: #0ff;
+  font-size: 18px;
+}
+
+.slskd-modal-close {
+  background: none;
+  border: none;
+  color: #f00;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  line-height: 32px;
+  text-align: center;
+}
+
+.slskd-modal-close:hover {
+  color: #f55;
+  background: #400;
+  border-radius: 4px;
+}
+
+.slskd-modal-body {
+  padding: 20px;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.slskd-search-info {
+  background: #222;
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  border-left: 3px solid #0ff;
+}
+
+.slskd-search-info p {
+  margin: 4px 0;
+  font-size: 13px;
+  color: #ccc;
+}
+
+.slskd-search-info strong {
+  color: #0ff;
+}
+
+.slskd-results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.slskd-result-item {
+  background: #222;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all 0.2s;
+}
+
+.slskd-result-item:hover {
+  background: #2a2a2a;
+  border-color: #0ff;
+}
+
+.slskd-result-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.slskd-result-filename {
+  font-size: 13px;
+  font-weight: 500;
+  color: #fff;
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slskd-result-meta {
+  font-size: 11px;
+  color: #888;
+  display: flex;
+  gap: 16px;
+}
+
+.slskd-result-meta span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.slskd-result-quality {
+  color: #0f0;
+  font-weight: 600;
+}
+
+.slskd-download-btn {
+  background: #0ff;
+  color: #000;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
+.slskd-download-btn:hover {
+  background: #0cc;
+  transform: scale(1.05);
+}
+
+.slskd-download-btn:disabled {
+  background: #555;
+  color: #888;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.slskd-no-results {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+  font-size: 14px;
+}
+
+.slskd-loading {
+  text-align: center;
+  padding: 40px;
+  color: #0ff;
+  font-size: 14px;
+}
+
+.slskd-loading::after {
+  content: '...';
+  animation: dots 1.5s steps(4, end) infinite;
+}
+
+@keyframes dots {
+  0%, 20% { content: '.'; }
+  40% { content: '..'; }
+  60%, 100% { content: '...'; }
+}
+
+.search-missing-btn {
+  background: #0ff;
+  color: #000;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: 6px;
+  transition: all 0.2s;
+}
+
+.search-missing-btn:hover {
+  background: #0cc;
+  transform: scale(1.05);
+}
+
 </style>
 </head>
 <body>
@@ -1238,11 +1500,33 @@ button:disabled {
       </div>
     </div>
     
-    <div class="box recently-added-box">
-      <h2>Recently Added</h2>
-      <div class="recently-added-scroll" id="recently-added"></div>
+    <div class="box library-stats-detailed-box">
+      <h2>Library Statistics</h2>
+      <div id="library-stats-detailed" class="library-stats-detailed">
+        <div class="stat-category">
+          <h3>Formats</h3>
+          <div id="format-stats" class="stat-list"></div>
+        </div>
+        <div class="stat-category">
+          <h3>Top Genres</h3>
+          <div id="genre-stats" class="stat-list scrollable"></div>
+        </div>
+        <div class="stat-category">
+          <h3>Years</h3>
+          <div id="year-stats" class="stat-list scrollable"></div>
+        </div>
+        <div class="stat-category">
+          <h3>Labels</h3>
+          <div id="label-stats" class="stat-list scrollable"></div>
+        </div>
+        <div class="stat-category">
+          <h3>Missing Tracks</h3>
+          <div id="missing-tracks-stats" class="stat-list scrollable"></div>
+        </div>
+      </div>
     </div>
   </div>
+
 
   <!-- BOTTOM: list, grid, artists, inbox -->
   <div class="bottom-container">
@@ -1838,7 +2122,7 @@ async function loadAlbums() {
     gridItemsToShow = PAGE_SIZE;
     renderAlbums();
     renderAlbumGrid();
-    renderRecentlyAdded(allAlbums);
+    renderLibraryStatistics(allAlbums);
     renderRecentArtists(allAlbums);
     renderAlbumsSidebar();
   } catch (e) { 
@@ -1906,37 +2190,153 @@ function filterAlbums() {
   renderAlbumGrid();
 }
 
-function renderRecentlyAdded(albums) {
-  const container = document.getElementById("recently-added");
+function renderLibraryStatistics(albums) {
+  if (!albums || albums.length === 0) return;
+  
+  // Format Statistics
+  const formats = {};
+  albums.forEach(a => {
+    (a.tracks || []).forEach(t => {
+      const format = t.format || 'Unknown';
+      formats[format] = (formats[format] || 0) + 1;
+    });
+  });
+  renderStatCategory('format-stats', formats, 'tracks');
+  
+  // Genre Statistics (top 20)
+  const genres = {};
+  albums.forEach(a => {
+    const genre = a.genre || a.genres || 'Unknown';
+    const genreList = Array.isArray(genre) ? genre : [genre];
+    genreList.forEach(g => {
+      const cleaned = String(g).trim();
+      if (cleaned) {
+        genres[cleaned] = (genres[cleaned] || 0) + 1;
+      }
+    });
+  });
+  renderStatCategory('genre-stats', genres, 'albums', 20);
+  
+  // Year Statistics (original_year preferred, fallback to year)
+  const years = {};
+  albums.forEach(a => {
+    const year = a.original_year || a.year || 'Unknown';
+    years[year] = (years[year] || 0) + 1;
+  });
+  renderStatCategory('year-stats', years, 'albums', null, true);
+  
+  // Label Statistics (top 15)
+  const labels = {};
+  albums.forEach(a => {
+    const label = a.label || 'Unknown';
+    labels[label] = (labels[label] || 0) + 1;
+  });
+  renderStatCategory('label-stats', labels, 'albums', 15);
+  
+  // Missing Tracks (albums with disctotal > 1 but incomplete tracks)
+  const missingAlbums = [];
+  albums.forEach(a => {
+    const disctotal = parseInt(a.disctotal) || 0;
+    if (disctotal > 1) {
+      const tracks = a.tracks || [];
+      const discs = new Set(tracks.map(t => t.disc || 1));
+      if (discs.size < disctotal) {
+        missingAlbums.push({
+          name: a.album || 'Unknown',
+          artist: a.albumartist || a.artist || '',
+          expected: disctotal,
+          found: discs.size,
+          album: a
+        });
+      }
+    }
+  });
+  renderMissingTracks('missing-tracks-stats', missingAlbums);
+}
+
+function renderStatCategory(containerId, data, unit, limit = null, sortByKey = false) {
+  const container = document.getElementById(containerId);
   if (!container) return;
-  container.innerHTML = "";
   
-  // Take first 15 albums (already sorted by most recent)
-  const recentAlbums = albums.slice(0, 15);
+  container.innerHTML = '';
   
-  recentAlbums.forEach((a, idx) => {
-    const item = document.createElement("div");
-    item.className = "recently-added-item";
-    item.onclick = () => selectAlbum(allAlbums.indexOf(a));
+  if (Object.keys(data).length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'stat-empty';
+    empty.textContent = 'No data';
+    container.appendChild(empty);
+    return;
+  }
+  
+  // Sort by count (descending) or by key (for years)
+  let sorted = Object.entries(data);
+  if (sortByKey) {
+    sorted.sort((a, b) => String(b[0]).localeCompare(String(a[0])));
+  } else {
+    sorted.sort((a, b) => b[1] - a[1]);
+  }
+  
+  // Limit results if specified
+  if (limit) {
+    sorted = sorted.slice(0, limit);
+  }
+  
+  sorted.forEach(([name, count]) => {
+    const item = document.createElement('div');
+    item.className = 'stat-item';
     
-    const cover = document.createElement("div");
-    cover.className = "recently-added-cover";
-    const img = document.createElement("img");
-    img.src = coverUrlFor(a);
-    img.onerror = () => { img.onerror = null; img.src = "/static/placeholder.jpg"; };
-    cover.appendChild(img);
+    const nameEl = document.createElement('div');
+    nameEl.className = 'stat-name';
+    nameEl.textContent = name;
+    nameEl.title = name; // Tooltip for long names
     
-    const title = document.createElement("div");
-    title.className = "recently-added-title";
-    title.textContent = a.album || "(Unknown)";
+    const countEl = document.createElement('div');
+    countEl.className = 'stat-count';
+    countEl.textContent = count;
     
-    const artist = document.createElement("div");
-    artist.className = "recently-added-artist";
-    artist.textContent = a.albumartist || a.artist || "";
+    item.appendChild(nameEl);
+    item.appendChild(countEl);
+    container.appendChild(item);
+  });
+}
+
+function renderMissingTracks(containerId, albums) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  
+  container.innerHTML = '';
+  
+  if (albums.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'stat-empty';
+    empty.textContent = 'All complete!';
+    container.appendChild(empty);
+    return;
+  }
+  
+  albums.forEach(missing => {
+    const item = document.createElement('div');
+    item.className = 'missing-album-item';
+    item.onclick = () => {
+      // Switch to Albums page and select this album
+      const idx = allAlbums.indexOf(missing.album);
+      if (idx >= 0) {
+        document.querySelector('[data-page="albums"]').click();
+        setTimeout(() => selectAlbum(idx), 100);
+      }
+    };
     
-    item.appendChild(cover);
-    item.appendChild(title);
-    item.appendChild(artist);
+    const name = document.createElement('div');
+    name.className = 'missing-album-name';
+    name.textContent = missing.name;
+    name.title = `${missing.name} - ${missing.artist}`;
+    
+    const info = document.createElement('div');
+    info.className = 'missing-album-info';
+    info.textContent = `${missing.found}/${missing.expected} discs`;
+    
+    item.appendChild(name);
+    item.appendChild(info);
     container.appendChild(item);
   });
 }
@@ -2529,6 +2929,259 @@ function clearPlaylist() {
   document.getElementById('playlist-results').style.display = 'none';
   document.getElementById('csv-file-input').value = '';
 }
+
+/* =============================================================================
+   SLSKD SEARCH JAVASCRIPT - Add to index.html <script> section
+   ============================================================================= */
+
+// Global state for slskd
+let currentSearchData = null;
+
+function openSlskdSearch(albumData, missingInfo) {
+  console.log('Opening slskd search for:', albumData.album);
+  
+  // Show modal
+  const modal = document.getElementById('slskd-search-modal');
+  if (!modal) {
+    console.error('slskd modal not found!');
+    return;
+  }
+  
+  modal.classList.add('active');
+  
+  // Update modal content
+  document.getElementById('slskd-album-name').textContent = 
+    `${albumData.albumartist} - ${albumData.album}`;
+  
+  document.getElementById('slskd-missing-info').textContent = 
+    `Missing ${missingInfo.expected - missingInfo.found} disc(s)`;
+  
+  // Show loading
+  const resultsContainer = document.getElementById('slskd-results-list');
+  resultsContainer.innerHTML = '<div class="slskd-loading">Searching slskd</div>';
+  
+  // Perform search
+  performSlskdSearch(albumData, missingInfo);
+}
+
+function closeSlskdSearch() {
+  const modal = document.getElementById('slskd-search-modal');
+  if (modal) {
+    modal.classList.remove('active');
+  }
+  currentSearchData = null;
+}
+
+async function performSlskdSearch(albumData, missingInfo) {
+  try {
+    const artist = albumData.albumartist || albumData.artist;
+    const album = albumData.album;
+    
+    // Build search URL
+    const params = new URLSearchParams({
+      artist: artist,
+      album: album,
+      file_type: 'flac'
+    });
+    
+    const response = await fetch(`/api/slskd/search?${params}`);
+    
+    if (!response.ok) {
+      throw new Error(`Search failed: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    currentSearchData = data;
+    
+    displaySlskdResults(data, albumData);
+    
+  } catch (error) {
+    console.error('slskd search error:', error);
+    
+    const resultsContainer = document.getElementById('slskd-results-list');
+    resultsContainer.innerHTML = `
+      <div class="slskd-no-results">
+        Search failed: ${error.message}
+      </div>
+    `;
+  }
+}
+
+function displaySlskdResults(data, albumData) {
+  const resultsContainer = document.getElementById('slskd-results-list');
+  
+  if (data.error) {
+    resultsContainer.innerHTML = `
+      <div class="slskd-no-results">
+        Error: ${data.error}
+      </div>
+    `;
+    return;
+  }
+  
+  if (!data.results || data.results.length === 0) {
+    resultsContainer.innerHTML = `
+      <div class="slskd-no-results">
+        No results found for "${data.query}"
+      </div>
+    `;
+    return;
+  }
+  
+  resultsContainer.innerHTML = '';
+  
+  data.results.forEach((result, index) => {
+    const item = document.createElement('div');
+    item.className = 'slskd-result-item';
+    
+    const info = document.createElement('div');
+    info.className = 'slskd-result-info';
+    
+    const filename = document.createElement('div');
+    filename.className = 'slskd-result-filename';
+    filename.textContent = result.filename;
+    filename.title = result.filename;
+    
+    const meta = document.createElement('div');
+    meta.className = 'slskd-result-meta';
+    
+    meta.innerHTML = `
+      <span>?? ${result.username}</span>
+      <span>?? ${formatFileSize(result.size)}</span>
+      ${result.bitrate ? `<span class="slskd-result-quality">?? ${result.bitrate} kbps</span>` : ''}
+      ${result.length ? `<span>?? ${formatDuration(result.length)}</span>` : ''}
+    `;
+    
+    info.appendChild(filename);
+    info.appendChild(meta);
+    
+    const downloadBtn = document.createElement('button');
+    downloadBtn.className = 'slskd-download-btn';
+    downloadBtn.textContent = 'Download';
+    downloadBtn.onclick = () => downloadFromSlskd(result, downloadBtn);
+    
+    item.appendChild(info);
+    item.appendChild(downloadBtn);
+    
+    resultsContainer.appendChild(item);
+  });
+}
+
+async function downloadFromSlskd(result, button) {
+  button.disabled = true;
+  button.textContent = 'Queueing...';
+  
+  try {
+    const formData = new FormData();
+    formData.append('username', result.username);
+    formData.append('filename', result.filename);
+    formData.append('search_id', result.search_id);
+    
+    const response = await fetch('/api/slskd/download', {
+      method: 'POST',
+      body: formData
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      button.textContent = '? Queued';
+      button.style.background = '#0f0';
+      
+      setTimeout(() => {
+        button.textContent = 'Download';
+        button.style.background = '';
+        button.disabled = false;
+      }, 3000);
+      
+      console.log('Download queued:', data);
+    } else {
+      throw new Error(data.error || 'Download failed');
+    }
+    
+  } catch (error) {
+    console.error('Download error:', error);
+    button.textContent = '? Failed';
+    button.style.background = '#f00';
+    
+    setTimeout(() => {
+      button.textContent = 'Download';
+      button.style.background = '';
+      button.disabled = false;
+    }, 3000);
+  }
+}
+
+function formatFileSize(bytes) {
+  if (!bytes) return '-';
+  const mb = bytes / 1024 / 1024;
+  if (mb < 1024) return mb.toFixed(1) + ' MB';
+  return (mb / 1024).toFixed(2) + ' GB';
+}
+
+function formatDuration(seconds) {
+  if (!seconds) return '-';
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${String(secs).padStart(2, '0')}`;
+}
+
+// Update the renderMissingTracks function to include search button
+function renderMissingTracks(containerId, albums) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  
+  container.innerHTML = '';
+  
+  if (albums.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'stat-empty';
+    empty.textContent = 'All complete!';
+    container.appendChild(empty);
+    return;
+  }
+  
+  albums.forEach(missing => {
+    const item = document.createElement('div');
+    item.className = 'missing-album-item';
+    
+    const name = document.createElement('div');
+    name.className = 'missing-album-name';
+    name.textContent = missing.name;
+    name.title = `${missing.name} - ${missing.artist}`;
+    
+    const info = document.createElement('div');
+    info.className = 'missing-album-info';
+    info.innerHTML = `${missing.found}/${missing.expected} discs`;
+    
+    // Add search button
+    const searchBtn = document.createElement('button');
+    searchBtn.className = 'search-missing-btn';
+    searchBtn.textContent = '?? Search';
+    searchBtn.onclick = (e) => {
+      e.stopPropagation();
+      openSlskdSearch(missing.album, missing);
+    };
+    
+    info.appendChild(searchBtn);
+    
+    // Keep the click to navigate functionality
+    item.onclick = () => {
+      const idx = allAlbums.indexOf(missing.album);
+      if (idx >= 0) {
+        document.querySelector('[data-page="albums"]').click();
+        setTimeout(() => selectAlbum(idx), 100);
+      }
+    };
+    
+    item.appendChild(name);
+    item.appendChild(info);
+    container.appendChild(item);
+  });
+}
+
+
+
 
 // ==================== INIT ====================
 

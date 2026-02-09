@@ -685,7 +685,7 @@ import httpx
 from typing import List, Dict, Any
 
 # slskd Configuration
-SLSKD_URL = "http://localhost:5030"
+SLSKD_URL = "http://10.0.0.100:5030"
 SLSKD_API_KEY = "PV1RixwWGOi91oVYfSMhd7JNVy1hj6jpcBOcdM+z1mKB+JnIQ2c4nwVWLgYi2JHd"
 
 def slskd_headers():
@@ -718,7 +718,7 @@ async def search_slskd(query: str, file_type: str = "flac") -> Dict[str, Any]:
                 }
             )
             
-            if search_response.status_code != 201:
+            if search_response.status_code not in [200, 201]:
                 logger.error(f"slskd search failed: {search_response.status_code}")
                 return {"error": "Search failed", "results": []}
             
@@ -1206,13 +1206,21 @@ class CoverHandler(FileSystemEventHandler):
 # ---------------------------------------------------------------------------
 
 def inbox_worker():
-    """Process inbox import queue"""
+    """Process inbox import queue with settling timer"""
     while not stop_event.is_set():
         try:
             timestamp = inbox_q.get(timeout=1)
             
             # Debounce
-            time.sleep(DEBOUNCE_INBOX)
+            # Settling timer - wait until no activity
+            deadline = time.time() + DEBOUNCE_INBOX
+            while time.time() < deadline:
+                try:
+                    new_timestamp = inbox_q.get(timeout=1)
+                    deadline = time.time() + DEBOUNCE_INBOX
+                    logger.debug("Inbox activity, resetting timer")
+                except Empty:
+                    continue
             
             # Clear the queue
             while not inbox_q.empty():
@@ -1224,7 +1232,7 @@ def inbox_worker():
             with inbox_lock:
                 inbox_queued.clear()
             
-            add_watcher_log("info", "Starting automatic inbox import")
+            add_watcher_log("info", "Starting automatic inbox import (after settling)")
             
             # Run import
             result = subprocess.run(

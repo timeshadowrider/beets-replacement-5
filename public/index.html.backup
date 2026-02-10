@@ -2488,7 +2488,7 @@ function renderAlbumDetail(album) {
     const table = document.createElement("table"); table.className = "tracklist-table";
     const thead = document.createElement("thead");
     const headerRow = document.createElement("tr");
-    ["#", "Title", "Artist", "Quality", "Duration"].forEach(h => {
+    ["#", "Title", "Artist", "Duration"].forEach(h => {
       const th = document.createElement("th"); th.textContent = h; headerRow.appendChild(th);
     });
     thead.appendChild(headerRow); table.appendChild(thead);
@@ -2504,21 +2504,7 @@ function renderAlbumDetail(album) {
       const titleTd = document.createElement("td"); titleTd.className = "track-title"; titleTd.textContent = t.title || "(Untitled)";
       const artistTd = document.createElement("td"); artistTd.textContent = t.artist || album.albumartist || album.artist || "";
       const durTd = document.createElement("td"); durTd.className = "track-duration"; durTd.textContent = formatTrackDuration(t.length);
-      const qualityTd = document.createElement("td");
-      qualityTd.style.fontSize = "11px";
-      qualityTd.style.color = "#0ff";
-      qualityTd.style.fontVariantNumeric = "tabular-nums";
-      let qualityStr = t.format || "?";
-      if (t.bitdepth || t.samplerate) {
-        const bitdepth = t.bitdepth || "?";
-        const samplerate = t.samplerate ? (t.samplerate / 1000).toFixed(1) : "?";
-        qualityStr += " • " + bitdepth + "/" + samplerate;
-      } else if (t.bitrate) {
-        const kbps = Math.round(t.bitrate / 1000);
-        qualityStr += " • " + kbps + "kbps";
-      }
-      qualityTd.textContent = qualityStr;
-      tr.appendChild(numTd); tr.appendChild(titleTd); tr.appendChild(artistTd); tr.appendChild(qualityTd); tr.appendChild(durTd);
+      tr.appendChild(numTd); tr.appendChild(titleTd); tr.appendChild(artistTd); tr.appendChild(durTd);
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);

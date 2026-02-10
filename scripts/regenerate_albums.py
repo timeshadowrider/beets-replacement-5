@@ -78,7 +78,8 @@ def get_all_albums():
 
 
 def get_tracks_for_album(album_id):
-    fmt = "$disc\t$track\t$title\t$length\t$bitrate\t$format\t$path\t$artist"
+    # UPDATED: Added $bitdepth and $samplerate for hi-res audio info
+    fmt = "$disc\t$track\t$title\t$length\t$bitrate\t$format\t$path\t$artist\t$bitdepth\t$samplerate"
     args = [
         "beet", "-c", BEETS_CONFIG, "list", "-f", fmt,
         f"album_id:{album_id}"
@@ -91,10 +92,10 @@ def get_tracks_for_album(album_id):
 
     for line in out.splitlines():
         parts = line.split("\t")
-        if len(parts) < 8:
+        if len(parts) < 10:
             continue
 
-        disc, track, title, length, bitrate, fmtc, path, artist = parts
+        disc, track, title, length, bitrate, fmtc, path, artist, bitdepth, samplerate = parts
 
         try:
             disc = int(disc)
@@ -106,15 +107,56 @@ def get_tracks_for_album(album_id):
         except Exception:
             track = None
 
+        # Parse length - Beets returns "3:02" format
         try:
-            length = int(float(length))
+            if length and ":" in length:
+                parts_len = length.split(":")
+                if len(parts_len) == 2:
+                    length = int(parts_len[0]) * 60 + int(parts_len[1])
+                elif len(parts_len) == 3:
+                    length = int(parts_len[0]) * 3600 + int(parts_len[1]) * 60 + int(parts_len[2])
+                else:
+                    length = None
+            elif length:
+                length = int(float(length))
+            else:
+                length = None
         except Exception:
             length = None
 
+        # Parse bitrate - Beets returns "933kbps" format
         try:
-            bitrate = int(bitrate)
+            if bitrate and "kbps" in bitrate:
+                bitrate = int(bitrate.replace("kbps", "").strip()) * 1000
+            elif bitrate:
+                bitrate = int(bitrate)
+            else:
+                bitrate = None
         except Exception:
             bitrate = None
+
+        # Parse bitdepth (16, 24, 32, etc.)
+        try:
+            bitdepth = int(bitdepth) if bitdepth and bitdepth != "0" else None
+        except Exception:
+            bitdepth = None
+
+        # Parse samplerate - Beets returns formatted strings like "44kHz", "96kHz"
+        # We need to convert to raw Hz values: 44100, 96000, etc.
+        try:
+            if samplerate and samplerate != "0":
+                # Handle formatted strings like "44kHz", "96kHz", "192kHz"
+                if "kHz" in samplerate:
+                    # Remove "kHz" and convert to float, then multiply by 1000
+                    khz_value = float(samplerate.replace("kHz", "").strip())
+                    samplerate = int(khz_value * 1000)
+                else:
+                    # Try parsing as raw number
+                    samplerate = int(samplerate)
+            else:
+                samplerate = None
+        except Exception:
+            samplerate = None
 
         if first_path is None:
             first_path = path
@@ -130,6 +172,8 @@ def get_tracks_for_album(album_id):
             "length": length,
             "bitrate": bitrate,
             "format": fmtc,
+            "bitdepth": bitdepth,
+            "samplerate": samplerate,
             "path": path
         })
 
@@ -183,7 +227,7 @@ def to_relative_cover(cover_abs: str) -> str:
 
 
 def regenerate():
-    logger.info("Starting full regeneration")
+    logger.info("Starting full regeneration (with bitdepth/samplerate/length/bitrate)")
 
     albums = get_all_albums()
     logger.info(f"Found {len(albums)} album entries from beets")

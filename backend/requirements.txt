@@ -12,3 +12,7 @@ humanize
 packaging
 python-multipart
 httpx
+
+# Enhanced Beets Case Normalizer Plugin
+# MusicBrainz API client for canonical artist name lookups
+musicbrainzngs>=0.7.1

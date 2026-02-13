@@ -1,103 +1,35 @@
 #!/usr/bin/env python3
-# recompute_recent.py
-# Recomputes /data/recent_albums.json and /data/recent_artists.json from /data/albums.json
-
 import json
 import os
 from pathlib import Path
 
-ALBUMS = "/data/albums.json"
-OUT_ALBUMS = "/data/recent_albums.json"
-OUT_ARTISTS = "/data/recent_artists.json"
+ALBUMS_FILE = "/data/albums.json"
+RECENT_FILE = "/data/recent_albums.json"
 LIB_ROOT = "/music/library"
 
-
-def get_album_mtime(album):
-    """
-    Get the most recent modification time for an album.
-    Tries multiple strategies to find the best timestamp.
-    """
-    # Strategy 1: Use the folder's mtime
-    folder = album.get("folder")
-    if folder:
-        # folder is like "/Artist/Album", need to prepend LIB_ROOT
-        folder_abs = os.path.join(LIB_ROOT, folder.lstrip("/"))
-        try:
-            if os.path.exists(folder_abs):
-                return os.path.getmtime(folder_abs)
-        except Exception:
-            pass
-    
-    # Strategy 2: Use the most recent track file mtime
-    tracks = album.get("tracks", [])
-    if tracks:
-        max_mtime = 0
-        for track in tracks:
-            track_path = track.get("path", "")
-            if track_path:
-                # If path is relative, make it absolute
-                if not track_path.startswith("/"):
-                    track_path = os.path.join(LIB_ROOT, track_path)
-                try:
-                    if os.path.exists(track_path):
-                        mtime = os.path.getmtime(track_path)
-                        max_mtime = max(max_mtime, mtime)
-                except Exception:
-                    continue
-        if max_mtime > 0:
-            return max_mtime
-    
-    # Strategy 3: Fallback to 0 if nothing works
-    return 0
-
-
 def main():
-    try:
-        with open(ALBUMS, "r", encoding="utf-8") as f:
-            albums = json.load(f)
-    except Exception as e:
-        print(f"Failed to load albums.json: {e}")
-        return 1
+    if not os.path.exists(ALBUMS_FILE):
+        return
 
-    print(f"Processing {len(albums)} albums...")
+    with open(ALBUMS_FILE, "r") as f:
+        albums = json.load(f)
 
-    # Add _mtime to each album for sorting
+    # Get folder mtimes
     for a in albums:
-        a["_mtime"] = get_album_mtime(a)
+        folder = a.get("folder", "")
+        abs_path = Path(LIB_ROOT) / folder.lstrip("/")
+        try:
+            a["_mtime"] = os.path.getmtime(abs_path)
+        except OSError:
+            a["_mtime"] = 0
 
-    # Sort by mtime (most recent first) and take top 50
-    albums_sorted = sorted(albums, key=lambda x: x["_mtime"], reverse=True)
-    recent_albums = albums_sorted[:50]
-
-    # Extract unique recent artists
-    seen = set()
-    recent_artists = []
-    for a in recent_albums:
-        artist = a.get("albumartist") or a.get("artist") or ""
-        if artist and artist not in seen:
-            seen.add(artist)
-            recent_artists.append({"artist": artist})
-
-    # Write output files
-    with open(OUT_ALBUMS, "w", encoding="utf-8") as f:
-        json.dump(recent_albums, f, indent=2, ensure_ascii=False)
-
-    with open(OUT_ARTISTS, "w", encoding="utf-8") as f:
-        json.dump(recent_artists, f, indent=2, ensure_ascii=False)
-
-    print(f"Wrote {len(recent_albums)} albums to {OUT_ALBUMS}")
-    print(f"Wrote {len(recent_artists)} artists to {OUT_ARTISTS}")
+    # Sort and save top 50 to recent_albums.json
+    recent = sorted(albums, key=lambda x: x["_mtime"], reverse=True)[:50]
     
-    # Show top 5 recent albums for verification
-    print("\nTop 5 most recent albums:")
-    for i, a in enumerate(recent_albums[:5], 1):
-        from datetime import datetime
-        mtime = a.get("_mtime", 0)
-        date_str = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M") if mtime > 0 else "unknown"
-        print(f"{i}. {a.get('albumartist', 'Unknown')} - {a.get('album', 'Unknown')} ({date_str})")
-    
-    return 0
-
+    with open(RECENT_FILE + ".tmp", "w") as f:
+        json.dump(recent, f, indent=2)
+    os.replace(RECENT_FILE + ".tmp", RECENT_FILE)
+    print(f"Updated {RECENT_FILE}")
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main()
